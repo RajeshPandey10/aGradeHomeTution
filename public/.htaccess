@@ -1,17 +1,22 @@
-Options -MultiViews
 DirectorySlash Off
 RewriteEngine On
 
-# Serve admin.html when /admin or /admin/ is requested
-RewriteRule ^admin/?$ admin.html [L]
+# Prevent directory listing
+Options -Indexes
 
-# For all other paths, serve .html if it exists
+# For existing directories without index.html, serve the matching .html file
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteCond %{REQUEST_FILENAME}/index.html !-f
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
+
+# For non-existing paths, try .html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-RewriteRule ^(.+)$ $1.html [L]
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
 
-# Custom 404 page
+# Custom 404
 ErrorDocument 404 /404.html
 
 # Security headers
