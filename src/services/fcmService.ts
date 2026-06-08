@@ -1,5 +1,4 @@
 import api from "@/lib/axios";
-import { handleRequest } from "./api";
 
 export interface FcmBatchResult {
   successCount: number;
@@ -14,6 +13,8 @@ export interface FcmResult {
 }
 
 export const fcmService = {
-  send: (payload: { title: string; body: string; role?: string; user_id?: string }) =>
-    handleRequest<FcmResult>(() => api.post("/api/fcm/send", payload)),
+  send: async (payload: { title: string; body: string; role?: string; user_id?: string }) => {
+    const res = await api.post("/api/fcm/send", payload);
+    return res.data as FcmResult;
+  },
 };

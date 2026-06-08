@@ -26,8 +26,13 @@ export default function NotificationsPage() {
       if (role) payload.role = role;
       if (user_id) payload.user_id = user_id;
       const res = await fcmService.send(payload as any);
-      setResult(res.data);
-      toast.success(res.data.message || "Notification sent successfully");
+      setResult(res);
+      const totalSuccess = res.results?.reduce((sum, r) => sum + r.successCount, 0) ?? 0;
+      if (totalSuccess > 0) {
+        toast.success(res.message || "Notification sent successfully");
+      } else {
+        toast.error(res.message || "Failed to send notification");
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.message || "Failed to send notification";
       toast.error(msg);
