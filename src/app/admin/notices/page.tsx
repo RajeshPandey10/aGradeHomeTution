@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2 } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
@@ -17,8 +17,13 @@ export default function NoticesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Notice | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
   const fetch = useCallback(async () => {
@@ -39,6 +44,9 @@ export default function NoticesPage() {
     setEditId(null);
     setTitle("");
     setSubtitle("");
+    setImageFiles([]);
+    setImagePreviews([]);
+    setExistingImages([]);
     setModalOpen(true);
   }, []);
 
@@ -46,28 +54,64 @@ export default function NoticesPage() {
     setEditId(n._id);
     setTitle(n.title);
     setSubtitle(n.subtitle || "");
+    setImageFiles([]);
+    setImagePreviews([]);
+    setExistingImages(n.images || []);
     setModalOpen(true);
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setImageFiles((prev) => [...prev, ...files]);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreviews((prev) => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  const removeNewImage = useCallback((index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const removeExistingImage = useCallback((url: string) => {
+    setExistingImages((prev) => prev.filter((u) => u !== url));
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
+      let allImages = [...existingImages];
+
+      if (imageFiles.length > 0) {
+        setUploading(true);
+        const uploadRes = await noticeService.uploadImages(imageFiles);
+        allImages = [...allImages, ...uploadRes.data.urls];
+        setUploading(false);
+      }
+
       if (editId) {
-        await noticeService.update(editId, { title, subtitle });
+        await noticeService.update(editId, { title, subtitle, images: allImages });
         toast.success("Notice updated successfully");
       } else {
-        await noticeService.create({ title, subtitle });
+        await noticeService.create({ title, subtitle, images: allImages });
         toast.success("Notice created successfully");
       }
       setModalOpen(false);
       fetch();
     } catch {
+      setUploading(false);
       toast.error(editId ? "Failed to update notice" : "Failed to create notice");
     } finally {
       setSaving(false);
     }
-  }, [title, subtitle, editId, fetch, toast]);
+  }, [title, subtitle, existingImages, imageFiles, editId, fetch, toast]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -80,6 +124,8 @@ export default function NoticesPage() {
       toast.error("Failed to delete notice");
     }
   }, [deleteTarget, fetch, toast]);
+
+  const isUploading = saving && uploading;
 
   return (
     <div>
@@ -103,11 +149,58 @@ export default function NoticesPage() {
             rows={3}
             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white"
           />
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Images</label>
+            <div className="flex flex-wrap gap-3">
+              {existingImages.map((url) => (
+                <div key={url} className="relative group">
+                  <img src={url} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                  <button
+                    type="button"
+                    onClick={() => removeExistingImage(url)}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {imagePreviews.map((preview, i) => (
+                <div key={preview} className="relative group">
+                  <img src={preview} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                  <button
+                    type="button"
+                    onClick={() => removeNewImage(i)}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors text-slate-400 hover:text-blue-500"
+              >
+                <Upload size={18} />
+                <span className="text-[10px] mt-1">Upload</span>
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/jpg"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+
           <div className="flex gap-3 justify-end pt-2">
             <ActionButton icon={X} label="Cancel" onClick={() => setModalOpen(false)} color="slate" />
             <ActionButtonSolid
-              icon={editId ? Pencil : Plus}
-              label={saving ? "Saving..." : editId ? "Update" : "Create"}
+              icon={isUploading ? Loader2 : editId ? Pencil : Plus}
+              label={isUploading ? "Uploading..." : saving ? "Saving..." : editId ? "Update" : "Create"}
               onClick={handleSubmit as any}
               disabled={saving}
               color="blue"
@@ -129,8 +222,29 @@ export default function NoticesPage() {
       {loading ? <Loading /> : notices.length === 0 ? <EmptyState message="No notices found" /> : (
         <DataTable
           columns={[
-            { key: "title", header: "Title", render: (n) => <span className="font-medium text-slate-900">{n.title}</span> },
-            { key: "subtitle", header: "Subtitle", render: (n) => <span className="text-slate-500">{n.subtitle || "—"}</span> },
+            { key: "title", header: "Title", render: (n) => (
+              <div className="flex items-center gap-3">
+                {n.images && n.images.length > 0 && (
+                  <img src={n.images[0]} alt="" className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
+                )}
+                <span className="font-medium text-slate-900">{n.title}</span>
+              </div>
+            )},
+            { key: "subtitle", header: "Subtitle", render: (n) => (
+              <span className="text-slate-500 line-clamp-2">{n.subtitle || "—"}</span>
+            )},
+            { key: "images", header: "Images", render: (n) => (
+              <div className="flex gap-1">
+                {(n.images || []).length > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                    <ImageIcon size={14} />
+                    {n.images!.length}
+                  </span>
+                ) : (
+                  <span className="text-slate-300">—</span>
+                )}
+              </div>
+            )},
             { key: "actions", header: "", render: (n) => (
               <div className="flex gap-1.5 justify-end">
                 <ActionButton icon={Pencil} label="Edit" onClick={() => openEdit(n)} color="blue" />
