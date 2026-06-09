@@ -1,5 +1,17 @@
 import { memo } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, X, Loader2 } from "lucide-react";
+
+const colorIconMap: Record<string, string> = {
+  red: "bg-red-100 text-red-600",
+  emerald: "bg-emerald-100 text-emerald-600",
+  blue: "bg-blue-100 text-blue-600",
+};
+
+const colorBtnMap: Record<string, string> = {
+  red: "bg-red-600 hover:bg-red-700",
+  emerald: "bg-emerald-600 hover:bg-emerald-700",
+  blue: "bg-blue-600 hover:bg-blue-700",
+};
 
 export const ConfirmDialog = memo(function ConfirmDialog({
   open,
@@ -22,25 +34,28 @@ export const ConfirmDialog = memo(function ConfirmDialog({
 }) {
   if (!open) return null;
 
-  const colors: Record<string, string> = {
-    red: "bg-red-600 hover:bg-red-700",
-    emerald: "bg-emerald-600 hover:bg-emerald-700",
-    blue: "bg-blue-600 hover:bg-blue-700",
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="relative bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6"
+        className="fixed inset-0 bg-black/40 transition-opacity"
+        onClick={onClose}
+      />
+      <div
+        className="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors cursor-pointer">
+        <button
+          onClick={onClose}
+          disabled={loading}
+          className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40 cursor-pointer"
+        >
           <X size={18} />
         </button>
         <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-            <AlertTriangle size={24} className="text-red-600" />
+          <div
+            className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${colorIconMap[confirmColor]}`}
+          >
+            <AlertTriangle size={24} />
           </div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <p className="text-sm text-slate-500 mt-2">{message}</p>
@@ -56,8 +71,9 @@ export const ConfirmDialog = memo(function ConfirmDialog({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-40 cursor-pointer ${colors[confirmColor]}`}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-40 cursor-pointer inline-flex items-center justify-center gap-2 ${colorBtnMap[confirmColor]}`}
           >
+            {loading && <Loader2 size={16} className="animate-spin" />}
             {loading ? "Processing..." : confirmLabel}
           </button>
         </div>

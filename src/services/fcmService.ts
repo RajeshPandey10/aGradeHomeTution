@@ -17,4 +17,9 @@ export const fcmService = {
     const res = await api.post("/api/fcm/send", payload);
     return res.data as FcmResult;
   },
+
+  delete: async (id: string) => {
+    const res = await api.delete(`/api/public/notifications/${id}`);
+    return res.data;
+  },
 };

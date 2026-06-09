@@ -23,6 +23,7 @@ export default function NoticesPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Notice | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -115,6 +116,7 @@ export default function NoticesPage() {
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
+    setDeleting(true);
     try {
       await noticeService.delete(deleteTarget._id);
       toast.success("Notice deleted successfully");
@@ -122,6 +124,8 @@ export default function NoticesPage() {
       fetch();
     } catch {
       toast.error("Failed to delete notice");
+    } finally {
+      setDeleting(false);
     }
   }, [deleteTarget, fetch, toast]);
 
@@ -217,6 +221,7 @@ export default function NoticesPage() {
         message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
         confirmLabel="Delete"
         confirmColor="red"
+        loading={deleting}
       />
 
       {loading ? <Loading /> : notices.length === 0 ? <EmptyState message="No notices found" /> : (
