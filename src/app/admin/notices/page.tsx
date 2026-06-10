@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3 } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
@@ -23,6 +23,7 @@ export default function NoticesPage() {
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [descPreview, setDescPreview] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Notice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,13 +157,41 @@ export default function NoticesPage() {
             rows={3}
             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white"
           />
-          <textarea
-            placeholder="Description (optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white"
-          />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Description (HTML supported)</label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setDescPreview(false)}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1.5 ${!descPreview ? "bg-blue-100 text-blue-700 font-medium" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              >
+                <Edit3 size={14} />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setDescPreview(true)}
+                className={`px-3 py-1.5 text-xs rounded-md transition-colors flex items-center gap-1.5 ${descPreview ? "bg-blue-100 text-blue-700 font-medium" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              >
+                <Eye size={14} />
+                Preview
+              </button>
+            </div>
+            {descPreview ? (
+              <div
+                className="w-full min-h-[120px] px-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm leading-relaxed [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1.5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_strong]:font-semibold"
+                dangerouslySetInnerHTML={{ __html: description }}
+              />
+            ) : (
+              <textarea
+                placeholder="Write HTML content here..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={8}
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white font-mono text-sm"
+              />
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Images</label>
@@ -249,7 +278,7 @@ export default function NoticesPage() {
               <span className="text-slate-500 line-clamp-2">{n.subtitle || "—"}</span>
             )},
             { key: "description", header: "Description", render: (n) => (
-              <span className="text-slate-500 line-clamp-2">{n.description || "—"}</span>
+              <div className="text-slate-500 line-clamp-2 text-sm [&_p]:inline [&_p]:mr-1" dangerouslySetInnerHTML={{ __html: n.description || "—" }} />
             )},
             { key: "images", header: "Images", render: (n) => (
               <div className="flex gap-1">
