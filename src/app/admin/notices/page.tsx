@@ -17,6 +17,7 @@ export default function NoticesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
+  const [description, setDescription] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -45,6 +46,7 @@ export default function NoticesPage() {
     setEditId(null);
     setTitle("");
     setSubtitle("");
+    setDescription("");
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages([]);
@@ -55,6 +57,7 @@ export default function NoticesPage() {
     setEditId(n._id);
     setTitle(n.title);
     setSubtitle(n.subtitle || "");
+    setDescription(n.description || "");
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages(n.images || []);
@@ -98,10 +101,10 @@ export default function NoticesPage() {
       }
 
       if (editId) {
-        await noticeService.update(editId, { title, subtitle, images: allImages });
+        await noticeService.update(editId, { title, subtitle, description, images: allImages });
         toast.success("Notice updated successfully");
       } else {
-        await noticeService.create({ title, subtitle, images: allImages });
+        await noticeService.create({ title, subtitle, description, images: allImages });
         toast.success("Notice created successfully");
       }
       setModalOpen(false);
@@ -112,7 +115,7 @@ export default function NoticesPage() {
     } finally {
       setSaving(false);
     }
-  }, [title, subtitle, existingImages, imageFiles, editId, fetch, toast]);
+  }, [title, subtitle, description, existingImages, imageFiles, editId, fetch, toast]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -151,6 +154,13 @@ export default function NoticesPage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             rows={3}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white"
+          />
+          <textarea
+            placeholder="Description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white"
           />
 
@@ -237,6 +247,9 @@ export default function NoticesPage() {
             )},
             { key: "subtitle", header: "Subtitle", render: (n) => (
               <span className="text-slate-500 line-clamp-2">{n.subtitle || "—"}</span>
+            )},
+            { key: "description", header: "Description", render: (n) => (
+              <span className="text-slate-500 line-clamp-2">{n.description || "—"}</span>
             )},
             { key: "images", header: "Images", render: (n) => (
               <div className="flex gap-1">

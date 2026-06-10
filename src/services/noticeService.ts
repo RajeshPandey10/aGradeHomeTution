@@ -5,6 +5,7 @@ export interface Notice {
   _id: string;
   title: string;
   subtitle?: string;
+  description?: string;
   images?: string[];
   createdAt?: string;
 }
@@ -16,10 +17,10 @@ export const noticeService = {
   getById: (id: string) =>
     handleRequest<Notice>(() => api.get(`/api/public/notices/${id}`)),
 
-  create: (data: { title: string; subtitle?: string; images?: string[] }) =>
+  create: (data: { title: string; subtitle?: string; description?: string; images?: string[] }) =>
     handleRequest<Notice>(() => api.post("/api/admin/notices", data)),
 
-  update: (id: string, data: { title: string; subtitle?: string; images?: string[] }) =>
+  update: (id: string, data: { title: string; subtitle?: string; description?: string; images?: string[] }) =>
     handleRequest<Notice>(() => api.put(`/api/admin/notices/${id}`, data)),
 
   delete: (id: string) =>
