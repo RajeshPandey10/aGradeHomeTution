@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock } from "lucide-react";
+import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -15,13 +15,21 @@ export default function ParentRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ParentProfile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ParentProfile | null>(null);
+  const [editing, setEditing] = useState<ParentProfile | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
   const toast = useToast();
 
   const fetch = useCallback(async () => {
     try {
       const res = await parentService.getRequests();
-      setRequests(res.data);
+      const sorted = (res.data || []).sort((a, b) => {
+        const aPrio = a.status === "pending" ? 0 : 1;
+        const bPrio = b.status === "pending" ? 0 : 1;
+        if (aPrio !== bPrio) return aPrio - bPrio;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+      setRequests(sorted);
     } catch {
       toast.error("Failed to load parent requests");
     } finally {
@@ -45,6 +53,33 @@ export default function ParentRequestsPage() {
       setProcessing(null);
     }
   }, [fetch, toast]);
+
+  const handleEdit = useCallback(async () => {
+    if (!editing) return;
+    setProcessing(editing._id);
+    try {
+      await parentService.update(editing._id, editForm);
+      toast.success("Parent request updated");
+      setEditing(null);
+      fetch();
+    } catch {
+      toast.error("Failed to update parent request");
+    } finally {
+      setProcessing(null);
+    }
+  }, [editing, editForm, fetch, toast]);
+
+  const openEdit = useCallback((r: ParentProfile) => {
+    setEditForm({
+      name: r.name || "",
+      phone: r.phone || "",
+      location: r.location || "",
+      duration: r.duration || "",
+      salary: r.salary || "",
+      subjects: r.subjects?.join(", ") || "",
+    });
+    setEditing(r);
+  }, []);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -126,13 +161,49 @@ export default function ParentRequestsPage() {
         loading={processing === deleteTarget?._id}
       />
 
+      <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit Parent Request">
+        {editing && (
+          <div className="space-y-4 text-sm">
+            {["name", "phone", "location", "duration", "salary"].map((field) => (
+              <div key={field}>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">{field}</label>
+                <input
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editForm[field] || ""}
+                  onChange={(e) => setEditForm((f) => ({ ...f, [field]: e.target.value }))}
+                />
+              </div>
+            ))}
+            <div>
+              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Subjects (comma separated)</label>
+              <input
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={editForm.subjects || ""}
+                onChange={(e) => setEditForm((f) => ({ ...f, subjects: e.target.value }))}
+              />
+            </div>
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <ActionButton icon={Eye} label="Cancel" onClick={() => setEditing(null)} color="slate" />
+              <ActionButtonSolid icon={CheckCircle} label="Save" onClick={handleEdit} disabled={processing === editing._id} color="blue" />
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {loading ? <Loading /> : requests.length === 0 ? <EmptyState message="No parent requests found" /> : (
         <DataTable
           columns={[
             { key: "name", header: "Name", render: (r) => <span className="font-medium text-slate-900">{r.name}</span> },
-            { key: "location", header: "Location", render: (r) => (
-              <span className="inline-flex items-center gap-1 text-slate-500 max-w-[200px] truncate"><MapPin size={14} className="shrink-0" />{r.location || "—"}</span>
-            )},
+            { key: "location", header: "Location", render: (r) => {
+              const loc = r.location || "";
+              const short = loc.split(",")[0] || loc;
+              return (
+                <span className="inline-flex items-center gap-1 text-slate-500 max-w-[180px]" title={loc}>
+                  <MapPin size={14} className="shrink-0" />
+                  <span className="truncate">{short || "—"}</span>
+                </span>
+              );
+            }},
             { key: "duration", header: "Duration", render: (r) => <span className="text-slate-500">{r.duration || "—"}</span> },
             { key: "salary", header: "Salary", render: (r) => <span className="text-slate-500">{r.salary || "—"}</span> },
             { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
@@ -142,6 +213,7 @@ export default function ParentRequestsPage() {
                 {r.status === "pending" && (
                   <ActionButton icon={CheckCircle} label="Approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
                 )}
+                <ActionButton icon={Pencil} label="Edit" onClick={() => openEdit(r)} disabled={processing === r._id} color="amber" />
                 <ActionButton icon={Trash2} label="Delete" onClick={() => setDeleteTarget(r)} disabled={processing === r._id} color="red" />
               </div>
             )},

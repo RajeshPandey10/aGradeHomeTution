@@ -8,18 +8,24 @@ export interface TeacherProfile {
   academicQualification?: string;
   experience?: string;
   about?: string;
+  gender?: string;
+  cv?: string;
+  identification?: string[];
   status: string;
   createdAt: string;
   user?: { name: string; email: string };
 }
 
 export const teacherService = {
-  getRequests: () =>
-    handleRequest<TeacherProfile[]>(() => api.get("/api/admin/teacher-requests")),
+  getRequests: (status?: string) =>
+    handleRequest<TeacherProfile[]>(() => api.get("/api/admin/teacher-requests", { params: status ? { status } : {} })),
 
   getAll: () =>
     handleRequest<TeacherProfile[]>(() => api.get("/api/admin/teachers")),
 
-  approve: (profileId: string, status: "verified" | "rejected") =>
+  approve: (profileId: string, status: string) =>
     handleRequest<TeacherProfile>(() => api.post("/api/admin/teachers/approve", { profileId, status })),
+
+  delete: (id: string) =>
+    handleRequest<void>(() => api.delete(`/api/admin/teachers/${id}`)),
 };

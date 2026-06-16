@@ -13,6 +13,7 @@ export interface ParentProfile {
   subjects?: string[];
   level?: string[];
   grade?: string[];
+  createdAt?: string;
   user?: { name: string; email: string };
 }
 
@@ -25,6 +26,9 @@ export const parentService = {
 
   approve: (profileId: string) =>
     handleRequest<ParentProfile>(() => api.post("/api/admin/parent-requests/approve", { profileId })),
+
+  update: (id: string, data: Partial<ParentProfile>) =>
+    handleRequest<ParentProfile>(() => api.put(`/api/parent/parent-request/${id}`, data)),
 
   delete: (id: string) =>
     handleRequest<void>(() => api.delete(`/api/admin/parent-requests/${id}`)),
