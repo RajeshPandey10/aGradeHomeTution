@@ -58,7 +58,22 @@ export default function ParentRequestsPage() {
     if (!editing) return;
     setProcessing(editing._id);
     try {
-      await parentService.update(editing._id, editForm);
+      const payload: Record<string, unknown> = { ...editForm };
+      ["subjects", "board", "specificBoard", "level", "grade", "medium"].forEach((f) => {
+        if (typeof payload[f] === "string") {
+          payload[f] = (payload[f] as string).split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      });
+      if (typeof payload.timeSlots === "string") {
+        payload.timeSlots = (payload.timeSlots as string).split(",").map((s) => {
+          const [start, end] = s.trim().split("-");
+          return { start: start?.trim() || "", end: end?.trim() || "" };
+        }).filter((s) => s.start && s.end);
+      }
+      if (payload.numberOfDays) {
+        payload.numberOfDays = parseInt(payload.numberOfDays as string, 10) || null;
+      }
+      await parentService.update(editing._id, payload);
       toast.success("Parent request updated");
       setEditing(null);
       fetch();
@@ -75,8 +90,20 @@ export default function ParentRequestsPage() {
       phone: r.phone || "",
       location: r.location || "",
       duration: r.duration || "",
+      tuitionType: r.tuitionType || "",
+      daysPerWeek: r.daysPerWeek || "",
+      numberOfDays: r.numberOfDays?.toString() || "",
+      teacherGender: r.teacherGender || "",
+      numberOfStudents: r.numberOfStudents || "",
       salary: r.salary || "",
       subjects: r.subjects?.join(", ") || "",
+      board: r.board?.join(", ") || "",
+      specificBoard: r.specificBoard?.join(", ") || "",
+      level: r.level?.join(", ") || "",
+      grade: r.grade?.join(", ") || "",
+      medium: r.medium?.join(", ") || "",
+      timeSlots: r.timeSlots?.map((s) => `${s.start}-${s.end}`).join(", ") || "",
+      requirements: r.requirements || "",
     });
     setEditing(r);
   }, []);
@@ -161,26 +188,99 @@ export default function ParentRequestsPage() {
         loading={processing === deleteTarget?._id}
       />
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit Parent Request">
+      <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit Parent Request" wide>
         {editing && (
-          <div className="space-y-4 text-sm">
-            {["name", "phone", "location", "duration", "salary"].map((field) => (
-              <div key={field}>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">{field}</label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm[field] || ""}
-                  onChange={(e) => setEditForm((f) => ({ ...f, [field]: e.target.value }))}
-                />
+          <div className="space-y-5 text-sm max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Name</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.name || ""} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
               </div>
-            ))}
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Phone</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.phone || ""} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Location</label>
+              <textarea className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} value={editForm.location || ""} onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Duration</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.duration || ""} onChange={(e) => setEditForm((f) => ({ ...f, duration: e.target.value }))} />
+              </div>
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Tuition Type</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.tuitionType || ""} onChange={(e) => setEditForm((f) => ({ ...f, tuitionType: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Days Per Week</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.daysPerWeek || ""} onChange={(e) => setEditForm((f) => ({ ...f, daysPerWeek: e.target.value }))} />
+              </div>
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Number of Days</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" type="number" value={editForm.numberOfDays || ""} onChange={(e) => setEditForm((f) => ({ ...f, numberOfDays: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Teacher Gender</label>
+                <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.teacherGender || ""} onChange={(e) => setEditForm((f) => ({ ...f, teacherGender: e.target.value }))}>
+                  <option value="">Select</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Any">Any</option>
+                </select>
+              </div>
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Number of Students</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.numberOfStudents || ""} onChange={(e) => setEditForm((f) => ({ ...f, numberOfStudents: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Salary</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.salary || ""} onChange={(e) => setEditForm((f) => ({ ...f, salary: e.target.value }))} />
+              </div>
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Board (comma separated)</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.board || ""} onChange={(e) => setEditForm((f) => ({ ...f, board: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Specific Board</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.specificBoard || ""} onChange={(e) => setEditForm((f) => ({ ...f, specificBoard: e.target.value }))} />
+              </div>
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Level (comma separated)</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.level || ""} onChange={(e) => setEditForm((f) => ({ ...f, level: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Grade (comma separated)</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.grade || ""} onChange={(e) => setEditForm((f) => ({ ...f, grade: e.target.value }))} />
+              </div>
+              <div>
+                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Medium (comma separated)</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.medium || ""} onChange={(e) => setEditForm((f) => ({ ...f, medium: e.target.value }))} />
+              </div>
+            </div>
             <div>
               <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Subjects (comma separated)</label>
-              <input
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={editForm.subjects || ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, subjects: e.target.value }))}
-              />
+              <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.subjects || ""} onChange={(e) => setEditForm((f) => ({ ...f, subjects: e.target.value }))} />
+            </div>
+            <div>
+              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Time Slots (e.g. 10:00-12:00, 14:00-16:00)</label>
+              <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" value={editForm.timeSlots || ""} onChange={(e) => setEditForm((f) => ({ ...f, timeSlots: e.target.value }))} />
+            </div>
+            <div>
+              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">Requirements</label>
+              <textarea className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} value={editForm.requirements || ""} onChange={(e) => setEditForm((f) => ({ ...f, requirements: e.target.value }))} />
             </div>
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
               <ActionButton icon={Eye} label="Cancel" onClick={() => setEditing(null)} color="slate" />

@@ -8,11 +8,23 @@ export interface ParentProfile {
   address?: string;
   location?: string;
   duration?: string;
+  tuitionType?: string;
+  daysPerWeek?: string;
+  numberOfDays?: number;
+  teacherGender?: string;
+  numberOfStudents?: string;
   salary?: string;
   status: string;
   subjects?: string[];
+  board?: string[];
+  specificBoard?: string[];
   level?: string[];
   grade?: string[];
+  medium?: string[];
+  timeSlots?: { start: string; end: string }[];
+  requirements?: string;
+  latitude?: number;
+  longitude?: number;
   createdAt?: string;
   user?: { name: string; email: string };
 }
