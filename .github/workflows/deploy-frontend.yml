@@ -18,7 +18,7 @@ jobs:
           cache: "npm"
 
       - name: ✨ Create .env
-        run: echo "NEXT_PUBLIC_API_URL=https://api.agradehometuition.rajeshpandey10.com.np" > .env
+        run: echo "NEXT_PUBLIC_API_URL=https://api-agrade.rajeshpandey10.com.np" > .env
 
       - name: 📦 Install dependencies
         run: npm ci
