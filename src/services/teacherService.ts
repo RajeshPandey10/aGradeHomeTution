@@ -12,6 +12,9 @@ export interface TeacherProfile {
   cv?: string;
   identification?: string[];
   status: string;
+  rejectionReason?: string | null;
+  rejectionRemarks?: string | null;
+  rejectedAt?: string | null;
   createdAt: string;
   user?: { name: string; email: string };
 }
@@ -23,8 +26,8 @@ export const teacherService = {
   getAll: () =>
     handleRequest<TeacherProfile[]>(() => api.get("/api/admin/teachers")),
 
-  approve: (profileId: string, status: string) =>
-    handleRequest<TeacherProfile>(() => api.post("/api/admin/teachers/approve", { profileId, status })),
+  approve: (profileId: string, status: string, rejectionReason?: string, rejectionRemarks?: string) =>
+    handleRequest<TeacherProfile>(() => api.post("/api/admin/teachers/approve", { profileId, status, rejectionReason, rejectionRemarks })),
 
   delete: (id: string) =>
     handleRequest<void>(() => api.delete(`/api/admin/teachers/${id}`)),
