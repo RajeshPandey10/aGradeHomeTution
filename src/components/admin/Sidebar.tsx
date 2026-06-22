@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Bell,
   History,
+  Ticket,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/admin/teachers", label: "Teachers", icon: GraduationCap },
   { href: "/admin/teacher-requests", label: "Teacher Requests", icon: ClipboardCheck },
   { href: "/admin/parent-requests", label: "Parent Requests", icon: ClipboardList },
+  { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/notifications", label: "Send Notification", icon: Bell },
   { href: "/admin/notification-logs", label: "Notification Logs", icon: History },
 ];
