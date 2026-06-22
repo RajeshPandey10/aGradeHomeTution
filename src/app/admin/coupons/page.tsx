@@ -14,10 +14,9 @@ type FormData = {
   couponValue: string;
   maxUses: string;
   expiresAt: string;
-  notifyTeachers: boolean;
 };
 
-const emptyForm: FormData = { code: "", couponType: "percentage", couponValue: "", maxUses: "", expiresAt: "", notifyTeachers: true };
+const emptyForm: FormData = { code: "", couponType: "percentage", couponValue: "", maxUses: "", expiresAt: "" };
 
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -58,7 +57,6 @@ export default function CouponsPage() {
       couponValue: String(coupon.couponValue),
       maxUses: coupon.maxUses !== null ? String(coupon.maxUses) : "",
       expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 16) : "",
-      notifyTeachers: false,
     });
     setShowForm(true);
   };
@@ -91,7 +89,6 @@ export default function CouponsPage() {
           couponValue: value,
           maxUses: form.maxUses ? Number(form.maxUses) : null,
           expiresAt: form.expiresAt || null,
-          notifyTeachers: form.notifyTeachers,
         });
         toast.success("Coupon created");
       }
@@ -219,18 +216,6 @@ export default function CouponsPage() {
                   />
                 </div>
               </div>
-              {!editing && (
-                <label className="flex items-center gap-2 cursor-pointer mt-1">
-                  <input
-                    type="checkbox"
-                    checked={form.notifyTeachers}
-                    onChange={(e) => setForm({ ...form, notifyTeachers: e.target.checked })}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    disabled={saving}
-                  />
-                  <span className="text-sm text-slate-700">Notify all teachers about this coupon</span>
-                </label>
-              )}
             </div>
             <div className="flex gap-3 mt-5">
               <button
