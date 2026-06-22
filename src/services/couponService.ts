@@ -17,7 +17,7 @@ export const couponService = {
   getAll: () =>
     handleRequest<Coupon[]>(() => api.get("/api/admin/coupons")),
 
-  create: (data: { code: string; couponType: string; couponValue: number; maxUses?: number | null; expiresAt?: string | null }) =>
+  create: (data: { code: string; couponType: string; couponValue: number; maxUses?: number | null; expiresAt?: string | null; notifyTeachers?: boolean }) =>
     handleRequest<Coupon>(() => api.post("/api/admin/coupons", data)),
 
   update: (id: string, data: Partial<Coupon>) =>
