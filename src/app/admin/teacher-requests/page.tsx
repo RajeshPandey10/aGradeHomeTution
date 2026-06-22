@@ -9,6 +9,14 @@ import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, ActionButtonSolid, Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 
+const STATUS_TABS = [
+  { label: "All", value: "" },
+  { label: "In Review", value: "in_review" },
+  { label: "Verified", value: "verified" },
+  { label: "Rejected", value: "rejected" },
+  { label: "Unverified", value: "unverified" },
+] as const;
+
 export default function TeacherRequestsPage() {
   const [requests, setRequests] = useState<TeacherProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,20 +26,21 @@ export default function TeacherRequestsPage() {
   const [rejectionRemarks, setRejectionRemarks] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
   const toast = useToast();
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await teacherService.getRequests();
+      const res = await teacherService.getRequests(statusFilter || undefined);
       setRequests(res.data);
     } catch {
       toast.error("Failed to load teacher requests");
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, statusFilter]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
   useRealtimeRefresh(fetchData, ["teacher-profile:status-updated"]);
 
   const handleApprove = useCallback(async (profileId: string, status = "verified") => {
@@ -80,6 +89,24 @@ export default function TeacherRequestsPage() {
     <div>
       <PageHeader title="Teacher Verification" subtitle="Review and verify teacher profiles" />
 
+      {/* Status Filter Tabs */}
+      <div className="flex gap-1.5 mb-5 flex-wrap">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setStatusFilter(tab.value)}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              statusFilter === tab.value
+                ? "bg-blue-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Profile Detail Modal */}
       <Modal
         open={!!selected}
         onClose={() => { setSelected(null); setViewingDoc(null); }}
@@ -88,6 +115,13 @@ export default function TeacherRequestsPage() {
       >
         {selected && !viewingDoc && (
           <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <StatusBadge status={selected.status} />
+              {selected.createdAt && (
+                <span className="text-slate-400 text-xs">Submitted {new Date(selected.createdAt).toLocaleDateString()}</span>
+              )}
+            </div>
+
             {[
               ["Name", selected.name || selected.user?.name],
               ["Email", selected.user?.email],
@@ -156,7 +190,10 @@ export default function TeacherRequestsPage() {
                 </>
               )}
               {selected.status === "rejected" && (
-                <ActionButtonSolid icon={CheckCircle} label="Re-approve" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+                <>
+                  <ActionButtonSolid icon={XCircle} label="Re-reject" onClick={() => openReject(selected)} disabled={processing === selected._id} color="red" />
+                  <ActionButtonSolid icon={CheckCircle} label="Re-approve" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+                </>
               )}
               {selected.status === "unverified" && (
                 <ActionButtonSolid icon={CheckCircle} label="Send for Review" onClick={() => handleApprove(selected._id, "in_review")} disabled={processing === selected._id} color="blue" />
@@ -172,13 +209,13 @@ export default function TeacherRequestsPage() {
               </button>
             </div>
             {viewingDoc.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) ? (
-              <div className="flex items-center justify-center bg-slate-100 rounded-lg min-h-[500px] p-4">
+              <div className="flex items-center justify-center bg-slate-100 rounded-lg min-h-125 p-4">
                 <img src={viewingDoc} alt="Document" className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-md" />
               </div>
             ) : (
               <iframe
                 src={`https://docs.google.com/viewer?url=${encodeURIComponent(viewingDoc)}&embedded=true`}
-                className="w-full min-h-[600px] rounded-lg border border-slate-200"
+                className="w-full min-h-150 rounded-lg border border-slate-200"
                 title="Document viewer"
               />
             )}
@@ -202,7 +239,7 @@ export default function TeacherRequestsPage() {
               </div>
               <h2 className="text-lg font-semibold text-slate-900">Reject Teacher Profile</h2>
               <p className="text-sm text-slate-500 mt-1">
-                Rejecting &quot;{rejectTarget.name || rejectTarget.user?.name}&quot;&apos;s profile. The teacher will be notified with the reason.
+                Rejecting <span className="font-medium text-slate-700">{rejectTarget.name || rejectTarget.user?.name}</span>. The teacher will be notified via email, push notification, and in-app notification.
               </p>
             </div>
             <div className="space-y-3">
@@ -217,6 +254,7 @@ export default function TeacherRequestsPage() {
                   placeholder="e.g. CV not readable, Invalid ID document"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   disabled={!!processing}
+                  autoFocus
                 />
               </div>
               <div>
@@ -254,15 +292,22 @@ export default function TeacherRequestsPage() {
         </div>
       )}
 
-      {loading ? <Loading /> : requests.length === 0 ? <EmptyState message="No verification requests" /> : (
+      {loading ? <Loading /> : requests.length === 0 ? <EmptyState message={statusFilter ? `No ${statusFilter.replace(/_/g, " ")} requests` : "No verification requests"} /> : (
         <DataTable
           columns={[
             { key: "name", header: "Name", render: (r) => <span className="font-medium text-slate-900">{r.name || r.user?.name}</span> },
             { key: "email", header: "Email", render: (r) => <span className="text-slate-500">{r.user?.email || "—"}</span> },
             { key: "qualification", header: "Qualification", render: (r) => (
-              <span className="text-slate-500 max-w-[220px] inline-block truncate">{r.academicQualification || "—"}</span>
+              <span className="text-slate-500 max-w-55 inline-block truncate">{r.academicQualification || "—"}</span>
             )},
-            { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            { key: "status", header: "Status", render: (r) => (
+              <div>
+                <StatusBadge status={r.status} />
+                {r.status === "rejected" && r.rejectionReason && (
+                  <p className="text-red-500 text-xs mt-0.5 max-w-40 truncate" title={r.rejectionReason}>{r.rejectionReason}</p>
+                )}
+              </div>
+            )},
             { key: "actions", header: "", render: (r) => (
               <div className="flex gap-1.5 justify-end">
                 <ActionButton icon={Eye} label="View" onClick={() => setSelected(r)} color="blue" />
@@ -271,6 +316,9 @@ export default function TeacherRequestsPage() {
                     <ActionButton icon={XCircle} label="Reject" onClick={() => openReject(r)} disabled={processing === r._id} color="red" />
                     <ActionButton icon={CheckCircle} label="Approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
                   </>
+                )}
+                {r.status === "rejected" && (
+                  <ActionButton icon={CheckCircle} label="Re-approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
                 )}
                 {r.status === "unverified" && (
                   <ActionButton icon={CheckCircle} label="Review" onClick={() => handleApprove(r._id, "in_review")} disabled={processing === r._id} color="blue" />
