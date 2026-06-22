@@ -15,14 +15,14 @@ export interface Coupon {
 
 export const couponService = {
   getAll: () =>
-    handleRequest<Coupon[]>(() => api.get("/api/coupon")),
+    handleRequest<Coupon[]>(() => api.get("/api/admin/coupons")),
 
   create: (data: { code: string; couponType: string; couponValue: number; maxUses?: number | null; expiresAt?: string | null }) =>
-    handleRequest<Coupon>(() => api.post("/api/coupon", data)),
+    handleRequest<Coupon>(() => api.post("/api/admin/coupons", data)),
 
   update: (id: string, data: Partial<Coupon>) =>
-    handleRequest<Coupon>(() => api.put(`/api/coupon/${id}`, data)),
+    handleRequest<Coupon>(() => api.put(`/api/admin/coupons/${id}`, data)),
 
   delete: (id: string) =>
-    handleRequest<void>(() => api.delete(`/api/coupon/${id}`)),
+    handleRequest<void>(() => api.delete(`/api/admin/coupons/${id}`)),
 };
