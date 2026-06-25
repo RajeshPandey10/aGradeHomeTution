@@ -8,6 +8,8 @@ import {
   ClipboardCheck,
   ClipboardList,
   TrendingUp,
+  CreditCard,
+  DollarSign,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useRealtimeRefresh } from "@/lib/socket";
@@ -30,6 +32,8 @@ export default function AdminDashboard() {
     { label: "Total Teachers", value: 0, icon: GraduationCap, color: "text-emerald-600", bg: "bg-emerald-100" },
     { label: "Pending Teacher Reqs", value: 0, icon: ClipboardCheck, color: "text-amber-600", bg: "bg-amber-100" },
     { label: "Pending Parent Reqs", value: 0, icon: ClipboardList, color: "text-rose-600", bg: "bg-rose-100" },
+    { label: "Fulfilled Requests", value: 0, icon: CreditCard, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { label: "Total Revenue", value: 0, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-100" },
   ]);
 
   const fetchStats = useCallback(async () => {
@@ -45,12 +49,17 @@ export default function AdminDashboard() {
         teacherReqsRes.data.data?.filter((t: any) => t.status === "in_review").length || 0;
       const pendingParents =
         parentReqsRes.data.data?.filter((t: any) => t.status === "pending").length || 0;
+      const parentReqs = parentReqsRes.data.data || [];
+      const fulfilledReqs = parentReqs.filter((r: any) => r.status === "fulfilled");
+      const totalRevenue = fulfilledReqs.reduce((sum: number, r: any) => sum + (r.payment?.payable || 0), 0);
 
       setStats([
         { label: "Total Parents", value: parentsRes.data.data?.length || 0, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
         { label: "Total Teachers", value: teachersRes.data.data?.length || 0, icon: GraduationCap, color: "text-emerald-600", bg: "bg-emerald-100" },
         { label: "Pending Teacher Reqs", value: pendingTeachers, icon: ClipboardCheck, color: "text-amber-600", bg: "bg-amber-100" },
         { label: "Pending Parent Reqs", value: pendingParents, icon: ClipboardList, color: "text-rose-600", bg: "bg-rose-100" },
+        { label: "Fulfilled Requests", value: fulfilledReqs.length, icon: CreditCard, color: "text-indigo-600", bg: "bg-indigo-100" },
+        { label: "Total Revenue", value: totalRevenue, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-100" },
       ]);
     } catch {
       toast.error("Failed to load dashboard stats");
@@ -89,7 +98,7 @@ export default function AdminDashboard() {
     <div>
       <PageHeader title="Dashboard" subtitle="Overview of your platform" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
 
@@ -103,6 +112,7 @@ export default function AdminDashboard() {
             {[
               { href: "/admin/teacher-requests", label: "Review Teacher Verification Requests" },
               { href: "/admin/parent-requests", label: "Review Parent Tuition Requests" },
+              { href: "/admin/payments", label: "View Payments & Invoices" },
               { href: "/admin/notices", label: "Manage Notices" },
               { href: "/admin/cms", label: "Update CMS Content" },
             ].map((item) => (
