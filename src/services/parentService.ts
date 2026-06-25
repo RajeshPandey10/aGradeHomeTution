@@ -27,17 +27,59 @@ export interface ParentProfile {
   longitude?: number;
   createdAt?: string;
   user?: { name: string; email: string };
+  parent?: { _id: string; name: string; email: string; phoneNumber?: string };
+  assignedTeacher?: { _id: string; name: string; email: string; phoneNumber?: string };
+  lockedBy?: { _id: string; name: string; email: string };
+  platformFeePercent?: number;
+  payment?: {
+    grossAmount: number;
+    total: number;
+    payable: number;
+    percentage: number;
+    couponType?: string | null;
+    couponValue?: number;
+  };
+  paymentSlip?: {
+    paymentAmount: number;
+    medium: string;
+    paymentRef: string;
+    paidAt?: string;
+  };
+  refund?: {
+    reason?: string;
+    refundedBy?: { _id: string; name: string; email: string };
+    refundedAt?: string;
+  };
+  teacherProfile?: {
+    name: string;
+    address: string;
+    phone?: string;
+    gender?: string;
+    academicQualification?: string;
+    experience?: string;
+    about?: string;
+    status?: string;
+  };
 }
 
 export const parentService = {
   getRequests: () =>
     handleRequest<ParentProfile[]>(() => api.get("/api/admin/parent-requests")),
 
+  getRequestDetail: (id: string) =>
+    handleRequest<ParentProfile>(() => api.get(`/api/admin/parent-requests/${id}`)),
+
   getAll: () =>
     handleRequest<ParentProfile[]>(() => api.get("/api/admin/parents")),
 
   approve: (profileId: string) =>
     handleRequest<ParentProfile>(() => api.post("/api/admin/parent-requests/approve", { profileId })),
+
+  resendInvoice: (id: string) =>
+    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/resend-invoice`)),
+
+  refund: (id: string, reason: string) =>
+    handleRequest<ParentProfile>(() => api.post(`/api/requests/${id}/refund`, { reason })),
 
   update: (id: string, data: Partial<ParentProfile>) =>
     handleRequest<ParentProfile>(() => api.put(`/api/parent/parent-request/${id}`, data)),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil } from "lucide-react";
+import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil, RotateCcw, Mail, User, BookOpen, Percent } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -9,6 +9,23 @@ import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, ActionButtonSolid, Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+
+function DetailRow({ label, value, icon: Icon }: { label: string; value?: string | number | null; icon?: React.ComponentType<{ size?: number; className?: string }> }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div>
+      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">{label}</span>
+      <p className="text-slate-900 mt-0.5 flex items-center gap-1.5">
+        {Icon && <Icon size={14} className="text-slate-400" />}
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SectionHeader({ title }: { title: string }) {
+  return <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-600 border-b border-slate-200 pb-1 pt-3">{title}</h3>;
+}
 
 export default function ParentRequestsPage() {
   const [requests, setRequests] = useState<ParentProfile[]>([]);
@@ -18,9 +35,12 @@ export default function ParentRequestsPage() {
   const [editing, setEditing] = useState<ParentProfile | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [refundTarget, setRefundTarget] = useState<ParentProfile | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const toast = useToast();
 
-  const fetch = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     try {
       const res = await parentService.getRequests();
       const sorted = (res.data || []).sort((a, b) => {
@@ -37,8 +57,17 @@ export default function ParentRequestsPage() {
     }
   }, [toast]);
 
-  useEffect(() => { fetch(); }, [fetch]);
-  useRealtimeRefresh(fetch, ["parent-request:status-updated", "parent-request:created"]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useRealtimeRefresh(fetchAll, ["parent-request:status-updated", "parent-request:created", "request:fulfilled", "request:available"]);
+
+  const handleView = useCallback(async (r: ParentProfile) => {
+    try {
+      const res = await parentService.getRequestDetail(r._id);
+      setSelected(res.data);
+    } catch {
+      setSelected(r);
+    }
+  }, []);
 
   const handleApprove = useCallback(async (requestId: string) => {
     setProcessing(requestId);
@@ -46,13 +75,42 @@ export default function ParentRequestsPage() {
       await parentService.approve(requestId);
       toast.success("Parent request approved and published");
       setSelected(null);
-      fetch();
+      fetchAll();
     } catch {
       toast.error("Failed to approve parent request");
     } finally {
       setProcessing(null);
     }
-  }, [fetch, toast]);
+  }, [fetchAll, toast]);
+
+  const handleResendInvoice = useCallback(async (id: string) => {
+    setProcessing(id);
+    try {
+      await parentService.resendInvoice(id);
+      toast.success("Invoice email resent to teacher and parent");
+    } catch {
+      toast.error("Failed to resend invoice");
+    } finally {
+      setProcessing(null);
+    }
+  }, [toast]);
+
+  const handleRefund = useCallback(async () => {
+    if (!refundTarget || !refundReason.trim()) return;
+    setProcessing(refundTarget._id);
+    try {
+      await parentService.refund(refundTarget._id, refundReason.trim());
+      toast.success("Request refunded successfully");
+      setRefundTarget(null);
+      setRefundReason("");
+      setSelected(null);
+      fetchAll();
+    } catch {
+      toast.error("Failed to refund request");
+    } finally {
+      setProcessing(null);
+    }
+  }, [refundTarget, refundReason, fetchAll, toast]);
 
   const handleEdit = useCallback(async () => {
     if (!editing) return;
@@ -76,13 +134,13 @@ export default function ParentRequestsPage() {
       await parentService.update(editing._id, payload);
       toast.success("Parent request updated");
       setEditing(null);
-      fetch();
+      fetchAll();
     } catch {
       toast.error("Failed to update parent request");
     } finally {
       setProcessing(null);
     }
-  }, [editing, editForm, fetch, toast]);
+  }, [editing, editForm, fetchAll, toast]);
 
   const openEdit = useCallback((r: ParentProfile) => {
     setEditForm({
@@ -115,74 +173,220 @@ export default function ParentRequestsPage() {
       await parentService.delete(deleteTarget._id);
       toast.success("Parent request deleted");
       setDeleteTarget(null);
-      fetch();
+      fetchAll();
     } catch {
       toast.error("Failed to delete parent request");
     } finally {
       setProcessing(null);
     }
-  }, [deleteTarget, fetch, toast]);
+  }, [deleteTarget, fetchAll, toast]);
+
+  const filtered = statusFilter ? requests.filter((r) => r.status === statusFilter) : requests;
 
   return (
     <div>
       <PageHeader title="Parent Requests" subtitle="Review and approve tuition requests from parents" />
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Request Details">
+      <div className="flex gap-1.5 mb-5 flex-wrap">
+        {[
+          { label: "All", value: "" },
+          { label: "Pending", value: "pending" },
+          { label: "Vacant", value: "vacant" },
+          { label: "Ongoing", value: "ongoing" },
+          { label: "Fulfilled", value: "fulfilled" },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setStatusFilter(tab.value)}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              statusFilter === tab.value
+                ? "bg-blue-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Detail Modal */}
+      <Modal open={!!selected} onClose={() => setSelected(null)} title="Request Details" wide>
         {selected && (
-          <div className="space-y-4 text-sm">
-            {[
-              ["Name", selected.name],
-              ["Phone", selected.phone],
-            ].filter(([, v]) => v).map(([label, value]) => (
-              <div key={label as string}>
-                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">{label as string}</span>
-                <p className="text-slate-900 mt-0.5">{value as string}</p>
-              </div>
-            ))}
-            {selected.location && (
-              <div>
-                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Location</span>
-                <p className="text-slate-900 mt-0.5 flex items-center gap-1.5"><MapPin size={14} className="text-slate-400" />{selected.location}</p>
-              </div>
-            )}
-            {selected.duration && (
-              <div>
-                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Duration</span>
-                <p className="text-slate-900 mt-0.5 flex items-center gap-1.5"><Clock size={14} className="text-slate-400" />{selected.duration}</p>
-              </div>
-            )}
-            {selected.salary && (
-              <div>
-                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Salary</span>
-                <p className="text-slate-900 mt-0.5 flex items-center gap-1.5"><DollarSign size={14} className="text-slate-400" />{selected.salary}</p>
-              </div>
-            )}
-            {selected.subjects?.length ? (
-              <div>
-                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Subjects</span>
-                <p className="text-slate-900 mt-0.5">{selected.subjects.join(", ")}</p>
-              </div>
-            ) : null}
-            <div>
-              <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Status</span>
-              <div className="mt-0.5"><StatusBadge status={selected.status} /></div>
+          <div className="space-y-3 text-sm max-h-[75vh] overflow-y-auto pr-1">
+            <div className="flex items-center gap-2 mb-1">
+              <StatusBadge status={selected.status} />
+              {selected.platformFeePercent != null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                  <Percent size={12} /> {selected.platformFeePercent}% fee
+                </span>
+              )}
+              {selected.createdAt && (
+                <span className="text-slate-400 text-xs">Created {new Date(selected.createdAt).toLocaleDateString()}</span>
+              )}
             </div>
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+
+            <SectionHeader title="Tuition Details" />
+            <div className="grid grid-cols-2 gap-3">
+              <DetailRow label="Name" value={selected.name} icon={User} />
+              <DetailRow label="Phone" value={selected.phone} />
+              <DetailRow label="Location" value={selected.location} icon={MapPin} />
+              <DetailRow label="Salary" value={selected.salary ? `Rs. ${selected.salary}` : undefined} icon={DollarSign} />
+              <DetailRow label="Duration" value={selected.duration} icon={Clock} />
+              <DetailRow label="Tuition Type" value={selected.tuitionType} />
+              <DetailRow label="Days Per Week" value={selected.daysPerWeek} />
+              <DetailRow label="Number of Days" value={selected.numberOfDays} />
+              <DetailRow label="Teacher Gender" value={selected.teacherGender} />
+              <DetailRow label="Number of Students" value={selected.numberOfStudents} />
+            </div>
+            <DetailRow label="Subjects" value={selected.subjects?.join(", ")} icon={BookOpen} />
+            <div className="grid grid-cols-2 gap-3">
+              <DetailRow label="Board" value={selected.board?.join(", ")} />
+              <DetailRow label="Level" value={selected.level?.join(", ")} />
+              <DetailRow label="Grade" value={selected.grade?.join(", ")} />
+              <DetailRow label="Medium" value={selected.medium?.join(", ")} />
+            </div>
+            <DetailRow label="Time Slots" value={selected.timeSlots?.map((s) => `${s.start}-${s.end}`).join(", ")} />
+            <DetailRow label="Requirements" value={selected.requirements} />
+
+            {selected.parent && (
+              <>
+                <SectionHeader title="Parent Info" />
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailRow label="Name" value={selected.parent.name} icon={User} />
+                  <DetailRow label="Email" value={selected.parent.email} />
+                  <DetailRow label="Phone" value={selected.parent.phoneNumber} />
+                </div>
+              </>
+            )}
+
+            {selected.assignedTeacher && (
+              <>
+                <SectionHeader title="Assigned Teacher" />
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailRow label="Name" value={selected.assignedTeacher.name} icon={User} />
+                  <DetailRow label="Email" value={selected.assignedTeacher.email} />
+                  <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber} />
+                </div>
+              </>
+            )}
+            {selected.teacherProfile && (
+              <>
+                <SectionHeader title="Teacher Profile" />
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailRow label="Name" value={selected.teacherProfile.name} />
+                  <DetailRow label="Phone" value={selected.teacherProfile.phone} />
+                  <DetailRow label="Address" value={selected.teacherProfile.address} />
+                  <DetailRow label="Gender" value={selected.teacherProfile.gender} />
+                  <DetailRow label="Qualification" value={selected.teacherProfile.academicQualification} />
+                  <DetailRow label="Experience" value={selected.teacherProfile.experience} />
+                </div>
+                <DetailRow label="About" value={selected.teacherProfile.about} />
+              </>
+            )}
+
+            {selected.payment && selected.payment.grossAmount > 0 && (
+              <>
+                <SectionHeader title="Payment Breakdown" />
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailRow label="Gross Amount" value={`Rs. ${selected.payment.grossAmount}`} icon={DollarSign} />
+                    <DetailRow label={`Platform Fee (${selected.payment.percentage}%)`} value={`Rs. ${selected.payment.payable}`} />
+                    {selected.payment.couponType && (
+                      <DetailRow label={`Coupon (${selected.payment.couponType})`} value={selected.payment.couponValue} />
+                    )}
+                    <DetailRow label="Teacher Net Amount" value={`Rs. ${selected.payment.total}`} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {selected.paymentSlip && selected.paymentSlip.paymentAmount && (
+              <>
+                <SectionHeader title="Payment Slip" />
+                <div className="bg-emerald-50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailRow label="Amount Paid" value={`Rs. ${selected.paymentSlip.paymentAmount}`} icon={DollarSign} />
+                    <DetailRow label="Medium" value={selected.paymentSlip.medium} />
+                    <DetailRow label="Reference" value={selected.paymentSlip.paymentRef} />
+                    <DetailRow label="Paid At" value={selected.paymentSlip.paidAt ? new Date(selected.paymentSlip.paidAt).toLocaleString() : undefined} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {selected.refund?.reason && (
+              <>
+                <SectionHeader title="Refund Info" />
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <DetailRow label="Reason" value={selected.refund.reason} />
+                  <DetailRow label="Refunded By" value={selected.refund.refundedBy?.name} />
+                  <DetailRow label="Refunded At" value={selected.refund.refundedAt ? new Date(selected.refund.refundedAt).toLocaleString() : undefined} />
+                </div>
+              </>
+            )}
+
+            {selected.lockedBy && selected.status === "ongoing" && (
+              <>
+                <SectionHeader title="Currently Locked By" />
+                <div className="bg-purple-50 rounded-lg p-3">
+                  <DetailRow label="Teacher" value={`${selected.lockedBy.name} (${selected.lockedBy.email})`} />
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200 flex-wrap">
               <ActionButton icon={Eye} label="Close" onClick={() => setSelected(null)} color="slate" />
               {selected.status === "pending" && (
                 <ActionButtonSolid icon={CheckCircle} label="Approve & Publish" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+              )}
+              {selected.status === "fulfilled" && (
+                <>
+                  <ActionButtonSolid icon={Mail} label="Resend Invoice" onClick={() => handleResendInvoice(selected._id)} disabled={processing === selected._id} color="blue" />
+                  <ActionButtonSolid icon={RotateCcw} label="Refund" onClick={() => { setRefundTarget(selected); setRefundReason(""); }} disabled={processing === selected._id} color="red" />
+                </>
               )}
             </div>
           </div>
         )}
       </Modal>
 
+      {/* Refund Dialog */}
+      {refundTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => { if (!processing) { setRefundTarget(null); } }} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">Refund Request</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Refunding <span className="font-medium text-slate-900">{refundTarget.name}</span> will reset the request back to vacant.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="e.g. Teacher requested cancellation, Payment dispute"
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                disabled={!!processing}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => { setRefundTarget(null); setRefundReason(""); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
+              <button onClick={handleRefund} disabled={!!processing || !refundReason.trim()} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer">{processing ? "Refunding..." : "Refund"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Delete Parent Request"
-        message={`Are you sure you want to delete the request from "${deleteTarget?.name || deleteTarget?.user?.name}"? This cannot be undone.`}
+        message={`Are you sure you want to delete the request from "${deleteTarget?.name || deleteTarget?.parent?.name}"? This cannot be undone.`}
         confirmLabel="Delete"
         confirmColor="red"
         loading={processing === deleteTarget?._id}
@@ -290,10 +494,15 @@ export default function ParentRequestsPage() {
         )}
       </Modal>
 
-      {loading ? <Loading /> : requests.length === 0 ? <EmptyState message="No parent requests found" /> : (
+      {loading ? <Loading /> : filtered.length === 0 ? <EmptyState message={statusFilter ? `No ${statusFilter} requests` : "No parent requests found"} /> : (
         <DataTable
           columns={[
-            { key: "name", header: "Name", render: (r) => <span className="font-medium text-slate-900">{r.name}</span> },
+            { key: "name", header: "Name", render: (r) => (
+              <div>
+                <span className="font-medium text-slate-900">{r.name}</span>
+                {r.parent && <p className="text-slate-400 text-xs">{r.parent.name}</p>}
+              </div>
+            )},
             { key: "location", header: "Location", render: (r) => {
               const loc = r.location || "";
               const short = loc.split(",")[0] || loc;
@@ -304,21 +513,34 @@ export default function ParentRequestsPage() {
                 </span>
               );
             }},
-            { key: "duration", header: "Duration", render: (r) => <span className="text-slate-500">{r.duration || "—"}</span> },
-            { key: "salary", header: "Salary", render: (r) => <span className="text-slate-500">{r.salary || "—"}</span> },
+            { key: "duration", header: "Duration", render: (r) => (
+              <div>
+                <span className="text-slate-500">{r.duration || "—"}</span>
+                {r.platformFeePercent != null && <p className="text-indigo-500 text-xs">{r.platformFeePercent}% fee</p>}
+              </div>
+            )},
+            { key: "salary", header: "Salary", render: (r) => <span className="text-slate-500">{r.salary ? `Rs. ${r.salary}` : "—"}</span> },
+            { key: "teacher", header: "Teacher", render: (r) => r.assignedTeacher ? (
+              <span className="text-emerald-600 text-xs font-medium">{r.assignedTeacher.name}</span>
+            ) : r.lockedBy ? (
+              <span className="text-purple-600 text-xs font-medium">{r.lockedBy.name} (locked)</span>
+            ) : <span className="text-slate-300">—</span> },
             { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
             { key: "actions", header: "", render: (r) => (
               <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Eye} label="View" onClick={() => setSelected(r)} color="blue" />
+                <ActionButton icon={Eye} label="View" onClick={() => handleView(r)} color="blue" />
                 {r.status === "pending" && (
                   <ActionButton icon={CheckCircle} label="Approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
+                )}
+                {r.status === "fulfilled" && (
+                  <ActionButton icon={Mail} label="Invoice" onClick={() => handleResendInvoice(r._id)} disabled={processing === r._id} color="blue" />
                 )}
                 <ActionButton icon={Pencil} label="Edit" onClick={() => openEdit(r)} disabled={processing === r._id} color="amber" />
                 <ActionButton icon={Trash2} label="Delete" onClick={() => setDeleteTarget(r)} disabled={processing === r._id} color="red" />
               </div>
             )},
           ]}
-          data={requests}
+          data={filtered}
         />
       )}
     </div>

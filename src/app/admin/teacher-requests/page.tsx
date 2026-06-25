@@ -125,6 +125,7 @@ export default function TeacherRequestsPage() {
             {[
               ["Name", selected.name || selected.user?.name],
               ["Email", selected.user?.email],
+              ["Phone", selected.phone || selected.user?.phoneNumber],
               ["Gender", selected.gender],
               ["Address", selected.address],
               ["Qualification", selected.academicQualification],

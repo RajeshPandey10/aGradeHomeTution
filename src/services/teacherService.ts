@@ -4,6 +4,7 @@ import { handleRequest } from "./api";
 export interface TeacherProfile {
   _id: string;
   name?: string;
+  phone?: string;
   address?: string;
   academicQualification?: string;
   experience?: string;
@@ -16,7 +17,7 @@ export interface TeacherProfile {
   rejectionRemarks?: string | null;
   rejectedAt?: string | null;
   createdAt: string;
-  user?: { name: string; email: string };
+  user?: { name: string; email: string; phoneNumber?: string; isVerified?: boolean };
 }
 
 export const teacherService = {
