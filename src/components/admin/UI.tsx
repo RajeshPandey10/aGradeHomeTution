@@ -63,7 +63,7 @@ export const ActionButtonSolid = memo(function ActionButtonSolid({
   icon: React.ComponentType<{ size?: number }>;
   label: string;
   onClick: () => void;
-  color?: "blue" | "red" | "emerald" | "amber";
+  color?: "blue" | "red" | "emerald" | "amber" | "orange";
   disabled?: boolean;
 }) {
   const colorClasses: Record<string, string> = {
@@ -71,6 +71,7 @@ export const ActionButtonSolid = memo(function ActionButtonSolid({
     red: "bg-red-600 hover:bg-red-700 text-white",
     emerald: "bg-emerald-600 hover:bg-emerald-700 text-white",
     amber: "bg-amber-600 hover:bg-amber-700 text-white",
+    orange: "bg-orange-600 hover:bg-orange-700 text-white",
   };
 
   return (

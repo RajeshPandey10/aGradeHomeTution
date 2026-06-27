@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil, RotateCcw, Mail, User, BookOpen, Percent } from "lucide-react";
+import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil, RotateCcw, Mail, User, BookOpen, Percent, AlertTriangle } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -111,6 +111,20 @@ export default function ParentRequestsPage() {
       setProcessing(null);
     }
   }, [refundTarget, refundReason, fetchAll, toast]);
+
+  const handleApproveRefund = useCallback(async (id: string) => {
+    setProcessing(id);
+    try {
+      await parentService.approveRefund(id);
+      toast.success("Refund approved and request reset to vacant");
+      setSelected(null);
+      fetchAll();
+    } catch {
+      toast.error("Failed to approve refund");
+    } finally {
+      setProcessing(null);
+    }
+  }, [fetchAll, toast]);
 
   const handleEdit = useCallback(async () => {
     if (!editing) return;
@@ -226,7 +240,7 @@ export default function ParentRequestsPage() {
             </div>
 
             <SectionHeader title="Tuition Details" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <DetailRow label="Name" value={selected.name} icon={User} />
               <DetailRow label="Phone" value={selected.phone} />
               <DetailRow label="Location" value={selected.location} icon={MapPin} />
@@ -239,7 +253,7 @@ export default function ParentRequestsPage() {
               <DetailRow label="Number of Students" value={selected.numberOfStudents} />
             </div>
             <DetailRow label="Subjects" value={selected.subjects?.join(", ")} icon={BookOpen} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <DetailRow label="Board" value={selected.board?.join(", ")} />
               <DetailRow label="Level" value={selected.level?.join(", ")} />
               <DetailRow label="Grade" value={selected.grade?.join(", ")} />
@@ -251,7 +265,7 @@ export default function ParentRequestsPage() {
             {selected.parent && (
               <>
                 <SectionHeader title="Parent Info" />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.parent.name} icon={User} />
                   <DetailRow label="Email" value={selected.parent.email} />
                   <DetailRow label="Phone" value={selected.parent.phoneNumber} />
@@ -262,7 +276,7 @@ export default function ParentRequestsPage() {
             {selected.assignedTeacher && (
               <>
                 <SectionHeader title="Assigned Teacher" />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.assignedTeacher.name} icon={User} />
                   <DetailRow label="Email" value={selected.assignedTeacher.email} />
                   <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber} />
@@ -272,7 +286,7 @@ export default function ParentRequestsPage() {
             {selected.teacherProfile && (
               <>
                 <SectionHeader title="Teacher Profile" />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.teacherProfile.name} />
                   <DetailRow label="Phone" value={selected.teacherProfile.phone} />
                   <DetailRow label="Address" value={selected.teacherProfile.address} />
@@ -288,7 +302,7 @@ export default function ParentRequestsPage() {
               <>
                 <SectionHeader title="Payment Breakdown" />
                 <div className="bg-slate-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <DetailRow label="Gross Amount" value={`Rs. ${selected.payment.grossAmount}`} icon={DollarSign} />
                     <DetailRow label={`Platform Fee (${selected.payment.percentage}%)`} value={`Rs. ${selected.payment.payable}`} />
                     {selected.payment.couponType && (
@@ -304,7 +318,7 @@ export default function ParentRequestsPage() {
               <>
                 <SectionHeader title="Payment Slip" />
                 <div className="bg-emerald-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <DetailRow label="Amount Paid" value={`Rs. ${selected.paymentSlip.paymentAmount}`} icon={DollarSign} />
                     <DetailRow label="Medium" value={selected.paymentSlip.medium} />
                     <DetailRow label="Reference" value={selected.paymentSlip.paymentRef} />
@@ -314,7 +328,19 @@ export default function ParentRequestsPage() {
               </>
             )}
 
-            {selected.refund?.reason && (
+            {selected.refund?.requestedBy && !selected.refund?.refundedBy && (
+              <>
+                <SectionHeader title="Pending Refund Request" />
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <DetailRow label="Requested By" value={selected.refund.requestedBy.name} />
+                  <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
+                  {selected.refund.phoneNumber && <DetailRow label="Phone" value={selected.refund.phoneNumber} />}
+                  <DetailRow label="Requested At" value={selected.refund.requestedAt ? new Date(selected.refund.requestedAt).toLocaleString() : undefined} />
+                </div>
+              </>
+            )}
+
+            {selected.refund?.refundedBy && (
               <>
                 <SectionHeader title="Refund Info" />
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -334,10 +360,13 @@ export default function ParentRequestsPage() {
               </>
             )}
 
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t border-slate-200">
               <ActionButton icon={Eye} label="Close" onClick={() => setSelected(null)} color="slate" />
               {selected.status === "pending" && (
                 <ActionButtonSolid icon={CheckCircle} label="Approve & Publish" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+              )}
+              {selected.status === "fulfilled" && selected.refund?.requestedBy && !selected.refund?.refundedBy && (
+                <ActionButtonSolid icon={AlertTriangle} label="Approve Refund" onClick={() => handleApproveRefund(selected._id)} disabled={processing === selected._id} color="orange" />
               )}
               {selected.status === "fulfilled" && (
                 <>
@@ -525,7 +554,16 @@ export default function ParentRequestsPage() {
             ) : r.lockedBy ? (
               <span className="text-purple-600 text-xs font-medium">{r.lockedBy.name} (locked)</span>
             ) : <span className="text-slate-300">—</span> },
-            { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            { key: "status", header: "Status", render: (r) => (
+              <div className="flex items-center gap-1.5">
+                <StatusBadge status={r.status} />
+                {r.refund?.requestedBy && !r.refund?.refundedBy && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                    <AlertTriangle size={11} /> Refund Requested
+                  </span>
+                )}
+              </div>
+            ) },
             { key: "actions", header: "", render: (r) => (
               <div className="flex gap-1.5 justify-end">
                 <ActionButton icon={Eye} label="View" onClick={() => handleView(r)} color="blue" />

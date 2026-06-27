@@ -47,8 +47,13 @@ export interface ParentProfile {
   };
   refund?: {
     reason?: string;
+    reasons?: string;
+    phoneNumber?: string;
+    qrImage?: string;
     refundedBy?: { _id: string; name: string; email: string };
     refundedAt?: string;
+    requestedBy?: { _id: string; name: string; email: string };
+    requestedAt?: string;
   };
   teacherProfile?: {
     name: string;
@@ -80,6 +85,9 @@ export const parentService = {
 
   refund: (id: string, reason: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/requests/${id}/refund`, { reason })),
+
+  approveRefund: (id: string) =>
+    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`)),
 
   update: (id: string, data: Partial<ParentProfile>) =>
     handleRequest<ParentProfile>(() => api.put(`/api/parent/parent-request/${id}`, data)),

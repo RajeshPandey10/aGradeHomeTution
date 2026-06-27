@@ -19,8 +19,8 @@ export function DataTable<T extends { _id: string }>({
   if (data.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <table className="w-full">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
+      <table className="w-full min-w-[700px]">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/50">
             {columns.map((col) => (
@@ -97,12 +97,12 @@ export const PageHeader = memo(function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">{title}</h1>
+        <h1 className="text-lg sm:text-xl font-bold text-slate-900">{title}</h1>
         {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
       </div>
-      {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
+      {action && <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">{action}</div>}
     </div>
   );
 });

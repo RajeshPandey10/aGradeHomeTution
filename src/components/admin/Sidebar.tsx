@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/notifications", label: "Send Notification", icon: Bell },
   { href: "/admin/notification-logs", label: "Notification Logs", icon: History },
+  { href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck },
 ];
 
 export default function Sidebar() {

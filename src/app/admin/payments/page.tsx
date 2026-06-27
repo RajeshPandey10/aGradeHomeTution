@@ -134,7 +134,7 @@ export default function PaymentsPage() {
             </div>
 
             <SectionHeader title="Tuition Details" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <DetailRow label="Name" value={selected.name} icon={User} />
               <DetailRow label="Location" value={selected.location} icon={MapPin} />
               <DetailRow label="Salary" value={selected.salary ? `Rs. ${selected.salary}` : undefined} icon={DollarSign} />
@@ -146,7 +146,7 @@ export default function PaymentsPage() {
             {selected.parent && (
               <>
                 <SectionHeader title="Parent" />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.parent.name} icon={User} />
                   <DetailRow label="Email" value={selected.parent.email} />
                   <DetailRow label="Phone" value={selected.parent.phoneNumber} />
@@ -157,7 +157,7 @@ export default function PaymentsPage() {
             {selected.assignedTeacher && (
               <>
                 <SectionHeader title="Teacher" />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.assignedTeacher.name} icon={User} />
                   <DetailRow label="Email" value={selected.assignedTeacher.email} />
                   <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber} />
@@ -165,7 +165,7 @@ export default function PaymentsPage() {
               </>
             )}
             {selected.teacherProfile && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <DetailRow label="Address" value={selected.teacherProfile.address} />
                 <DetailRow label="Qualification" value={selected.teacherProfile.academicQualification} />
                 <DetailRow label="Experience" value={selected.teacherProfile.experience} />
@@ -176,7 +176,7 @@ export default function PaymentsPage() {
               <>
                 <SectionHeader title="Payment Breakdown" />
                 <div className="bg-slate-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <DetailRow label="Gross Amount" value={`Rs. ${selected.payment.grossAmount}`} icon={DollarSign} />
                     <DetailRow label={`Platform Fee (${selected.payment.percentage}%)`} value={`Rs. ${selected.payment.payable}`} />
                     {selected.payment.couponType && (
@@ -192,7 +192,7 @@ export default function PaymentsPage() {
               <>
                 <SectionHeader title="Payment Slip" />
                 <div className="bg-emerald-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <DetailRow label="Amount Paid" value={`Rs. ${selected.paymentSlip.paymentAmount}`} icon={DollarSign} />
                     <DetailRow label="Medium" value={selected.paymentSlip.medium} />
                     <DetailRow label="Reference" value={selected.paymentSlip.paymentRef} />
@@ -213,7 +213,7 @@ export default function PaymentsPage() {
               </>
             )}
 
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t border-slate-200">
               <ActionButton icon={Eye} label="Close" onClick={() => setSelected(null)} color="slate" />
               {selected.status === "fulfilled" && (
                 <>
