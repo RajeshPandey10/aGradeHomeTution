@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil, RotateCcw, Mail, User, BookOpen, Percent, AlertTriangle } from "lucide-react";
+import { CheckCircle, Eye, Trash2, MapPin, DollarSign, Clock, Pencil, RotateCcw, Mail, User, BookOpen, Percent, AlertTriangle, XCircle } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -37,6 +37,8 @@ export default function ParentRequestsPage() {
   const [editForm, setEditForm] = useState<Record<string, string>>({});
   const [refundTarget, setRefundTarget] = useState<ParentProfile | null>(null);
   const [refundReason, setRefundReason] = useState("");
+  const [rejectRefundTarget, setRejectRefundTarget] = useState<ParentProfile | null>(null);
+  const [rejectRefundReason, setRejectRefundReason] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const toast = useToast();
 
@@ -125,6 +127,23 @@ export default function ParentRequestsPage() {
       setProcessing(null);
     }
   }, [fetchAll, toast]);
+
+  const handleRejectRefund = useCallback(async () => {
+    if (!rejectRefundTarget) return;
+    setProcessing(rejectRefundTarget._id);
+    try {
+      await parentService.rejectRefund(rejectRefundTarget._id, rejectRefundReason.trim() || undefined);
+      toast.success("Refund request rejected");
+      setRejectRefundTarget(null);
+      setRejectRefundReason("");
+      setSelected(null);
+      fetchAll();
+    } catch {
+      toast.error("Failed to reject refund");
+    } finally {
+      setProcessing(null);
+    }
+  }, [rejectRefundTarget, rejectRefundReason, fetchAll, toast]);
 
   const handleEdit = useCallback(async () => {
     if (!editing) return;
@@ -331,11 +350,17 @@ export default function ParentRequestsPage() {
             {selected.refund?.requestedBy && !selected.refund?.refundedBy && (
               <>
                 <SectionHeader title="Pending Refund Request" />
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
                   <DetailRow label="Requested By" value={selected.refund.requestedBy.name} />
                   <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
                   {selected.refund.phoneNumber && <DetailRow label="Phone" value={selected.refund.phoneNumber} />}
                   <DetailRow label="Requested At" value={selected.refund.requestedAt ? new Date(selected.refund.requestedAt).toLocaleString() : undefined} />
+                  {selected.refund.qrImage && (
+                    <div>
+                      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">QR Code</span>
+                      <img src={selected.refund.qrImage} alt="Refund QR" className="mt-1 w-40 h-40 object-contain rounded-lg border border-amber-200" />
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -366,7 +391,10 @@ export default function ParentRequestsPage() {
                 <ActionButtonSolid icon={CheckCircle} label="Approve & Publish" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
               )}
               {selected.status === "fulfilled" && selected.refund?.requestedBy && !selected.refund?.refundedBy && (
-                <ActionButtonSolid icon={AlertTriangle} label="Approve Refund" onClick={() => handleApproveRefund(selected._id)} disabled={processing === selected._id} color="orange" />
+                <>
+                  <ActionButtonSolid icon={AlertTriangle} label="Approve Refund" onClick={() => handleApproveRefund(selected._id)} disabled={processing === selected._id} color="orange" />
+                  <ActionButtonSolid icon={XCircle} label="Reject Refund" onClick={() => { setRejectRefundTarget(selected); setRejectRefundReason(""); }} disabled={processing === selected._id} color="red" />
+                </>
               )}
               {selected.status === "fulfilled" && (
                 <>
@@ -405,6 +433,37 @@ export default function ParentRequestsPage() {
             <div className="flex gap-3 mt-5">
               <button onClick={() => { setRefundTarget(null); setRefundReason(""); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
               <button onClick={handleRefund} disabled={!!processing || !refundReason.trim()} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer">{processing ? "Refunding..." : "Refund"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Refund Dialog */}
+      {rejectRefundTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => { if (!processing) { setRejectRefundTarget(null); } }} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">Reject Refund Request</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Rejecting the refund for <span className="font-medium text-slate-900">{rejectRefundTarget.name}</span>. The request will stay fulfilled.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Reason (optional)
+              </label>
+              <textarea
+                value={rejectRefundReason}
+                onChange={(e) => setRejectRefundReason(e.target.value)}
+                placeholder="e.g. Refund policy not applicable, insufficient grounds"
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                disabled={!!processing}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => { setRejectRefundTarget(null); setRejectRefundReason(""); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
+              <button onClick={handleRejectRefund} disabled={!!processing} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer">{processing ? "Rejecting..." : "Reject Refund"}</button>
             </div>
           </div>
         </div>

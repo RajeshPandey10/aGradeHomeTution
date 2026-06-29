@@ -89,6 +89,9 @@ export const parentService = {
   approveRefund: (id: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`)),
 
+  rejectRefund: (id: string, reason?: string) =>
+    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/reject-refund`, { reason })),
+
   update: (id: string, data: Partial<ParentProfile>) =>
     handleRequest<ParentProfile>(() => api.put(`/api/parent/parent-request/${id}`, data)),
 
