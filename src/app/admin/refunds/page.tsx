@@ -16,6 +16,7 @@ import {
   Trash2,
   FileText,
   ExternalLink,
+  ZoomIn,
 } from "lucide-react";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -23,6 +24,7 @@ import { useRealtimeRefresh } from "@/lib/socket";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, ActionButtonSolid, Loading, EmptyState } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
+import { ImageLightbox, useLightbox } from "@/components/admin/ImageLightbox";
 import api from "@/lib/axios";
 
 interface TeacherProfileSnapshot {
@@ -87,23 +89,41 @@ function CvLink({ url }: { url?: string | null }) {
   );
 }
 
-function IdentificationLinks({ urls }: { urls?: string[] | null }) {
+function IdentificationLinks({ urls, onZoom }: { urls?: string[] | null; onZoom: (url: string) => void }) {
   if (!urls || urls.length === 0) return null;
   return (
     <div>
       <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Identification Documents</span>
       <div className="flex flex-wrap gap-2 mt-1">
         {urls.map((url, i) => (
-          <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block">
-            <img src={url} alt={`ID ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-slate-200 hover:border-blue-400 transition-colors" />
-          </a>
+          <button key={url} type="button" onClick={() => onZoom(url)} className="block cursor-zoom-in group relative">
+            <img src={url} alt={`ID ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-slate-200 group-hover:border-blue-400 transition-colors" />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg">
+              <ZoomIn size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            </span>
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-function TeacherProfileSection({ name, email, phoneNumber, profile }: { name?: string; email?: string; phoneNumber?: string; profile?: TeacherProfileSnapshot | null }) {
+function QrPreview({ url, onZoom }: { url?: string | null; onZoom: (url: string) => void }) {
+  if (!url) return null;
+  return (
+    <div>
+      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><ImageIcon size={12} /> QR Code</span>
+      <button type="button" onClick={() => onZoom(url)} className="mt-1 block cursor-zoom-in group relative w-40 h-40">
+        <img src={url} alt="Refund QR" className="w-40 h-40 object-contain rounded-lg border border-amber-200 group-hover:border-blue-400 transition-colors bg-white" />
+        <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg">
+          <ZoomIn size={22} className="text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function TeacherProfileSection({ name, email, phoneNumber, profile, onZoom }: { name?: string; email?: string; phoneNumber?: string; profile?: TeacherProfileSnapshot | null; onZoom: (url: string) => void }) {
   return (
     <>
       <SectionHeader title="Teacher" />
@@ -119,7 +139,7 @@ function TeacherProfileSection({ name, email, phoneNumber, profile }: { name?: s
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <CvLink url={profile?.cv} />
       </div>
-      <IdentificationLinks urls={profile?.identification} />
+      <IdentificationLinks urls={profile?.identification} onZoom={onZoom} />
     </>
   );
 }
@@ -141,6 +161,7 @@ export default function RefundsPage() {
   const [approveTarget, setApproveTarget] = useState<ParentProfile | null>(null);
   const [approveResolution, setApproveResolution] = useState<Resolution>("vacant");
   const [approveReason, setApproveReason] = useState("");
+  const { lightboxSrc, openLightbox, closeLightbox } = useLightbox();
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
@@ -265,6 +286,7 @@ export default function RefundsPage() {
                 email={selected.assignedTeacher.email}
                 phoneNumber={selected.assignedTeacher.phoneNumber}
                 profile={selected.teacherProfile}
+                onZoom={openLightbox}
               />
             )}
 
@@ -289,14 +311,7 @@ export default function RefundsPage() {
                   <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
                   {selected.refund.phoneNumber && <DetailRow label="Phone" value={selected.refund.phoneNumber} icon={Phone} />}
                   <DetailRow label="Requested At" value={selected.refund.requestedAt ? new Date(selected.refund.requestedAt).toLocaleString() : undefined} icon={Calendar} />
-                  {selected.refund.qrImage && (
-                    <div>
-                      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><ImageIcon size={12} /> QR Code</span>
-                      <a href={selected.refund.qrImage} target="_blank" rel="noopener noreferrer">
-                        <img src={selected.refund.qrImage} alt="Refund QR" className="mt-1 w-40 h-40 object-contain rounded-lg border border-amber-200 hover:border-blue-400 transition-colors" />
-                      </a>
-                    </div>
-                  )}
+                  <QrPreview url={selected.refund.qrImage} onZoom={openLightbox} />
                 </div>
               </>
             )}
@@ -347,6 +362,7 @@ export default function RefundsPage() {
                 email={selectedLog.details.teacher.email}
                 phoneNumber={selectedLog.details.teacher.phoneNumber}
                 profile={selectedLog.details.teacher.profile}
+                onZoom={openLightbox}
               />
             )}
 
@@ -357,14 +373,7 @@ export default function RefundsPage() {
                   <DetailRow label="Reason" value={selectedLog.details.originalRefundRequest.reason || selectedLog.details.originalRefundRequest.reasons} />
                   {selectedLog.details.originalRefundRequest.phoneNumber && <DetailRow label="Phone" value={selectedLog.details.originalRefundRequest.phoneNumber} icon={Phone} />}
                   <DetailRow label="Requested At" value={selectedLog.details.originalRefundRequest.requestedAt ? new Date(selectedLog.details.originalRefundRequest.requestedAt).toLocaleString() : undefined} icon={Calendar} />
-                  {selectedLog.details.originalRefundRequest.qrImage && (
-                    <div>
-                      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><ImageIcon size={12} /> QR Code</span>
-                      <a href={selectedLog.details.originalRefundRequest.qrImage} target="_blank" rel="noopener noreferrer">
-                        <img src={selectedLog.details.originalRefundRequest.qrImage} alt="Refund QR" className="mt-1 w-40 h-40 object-contain rounded-lg border border-amber-200 hover:border-blue-400 transition-colors" />
-                      </a>
-                    </div>
-                  )}
+                  <QrPreview url={selectedLog.details.originalRefundRequest.qrImage} onZoom={openLightbox} />
                 </div>
               </>
             )}
@@ -604,6 +613,8 @@ export default function RefundsPage() {
           </div>
         )
       )}
+
+      <ImageLightbox src={lightboxSrc || ""} open={!!lightboxSrc} onClose={closeLightbox} />
     </div>
   );
 }
