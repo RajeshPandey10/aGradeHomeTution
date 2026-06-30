@@ -45,7 +45,7 @@ interface RefundSnapshot {
   parent?: { _id: string; name?: string; email?: string; phoneNumber?: string } | null;
   teacher?: { _id: string; name?: string; email?: string; phoneNumber?: string; profile?: TeacherProfileSnapshot | null } | null;
   originalRefundRequest?: { reason?: string; reasons?: string; phoneNumber?: string; qrImage?: string; requestedAt?: string };
-  resolution?: "vacant" | "delete";
+  resolution?: "vacant" | "delete" | "keep";
   adminReason?: string;
 }
 
@@ -159,8 +159,9 @@ export default function RefundsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ParentProfile | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [rejectResolution, setRejectResolution] = useState<RejectResolution>("keep");
   const [approveTarget, setApproveTarget] = useState<ParentProfile | null>(null);
-  const [approveResolution, setApproveResolution] = useState<Resolution>("vacant");
+  const [approveResolution, setApproveResolution] = useState<ApproveResolution>("vacant");
   const [approveReason, setApproveReason] = useState("");
   const { lightboxSrc, openLightbox, closeLightbox } = useLightbox();
   const toast = useToast();
@@ -221,10 +222,17 @@ export default function RefundsPage() {
     if (!rejectTarget || !rejectReason.trim()) return;
     setProcessing(rejectTarget._id);
     try {
-      await parentService.rejectRefund(rejectTarget._id, rejectReason.trim());
-      toast.success("Refund request rejected");
+      await parentService.rejectRefund(rejectTarget._id, rejectReason.trim(), rejectResolution);
+      toast.success(
+        rejectResolution === "delete"
+          ? "Refund rejected — tuition request closed permanently"
+          : rejectResolution === "vacant"
+            ? "Refund rejected — request reset to vacant"
+            : "Refund request rejected",
+      );
       setRejectTarget(null);
       setRejectReason("");
+      setRejectResolution("keep");
       setSelected(null);
       fetchAll();
     } catch {
@@ -232,7 +240,7 @@ export default function RefundsPage() {
     } finally {
       setProcessing(null);
     }
-  }, [rejectTarget, rejectReason, fetchAll, toast]);
+  }, [rejectTarget, rejectReason, rejectResolution, fetchAll, toast]);
 
   const tabs: { label: string; value: Tab; count: number }[] = [
     { label: "Pending", value: "pending", count: pending.length },
@@ -322,7 +330,7 @@ export default function RefundsPage() {
               {selected.refund?.requestedBy && !selected.refund?.refundedBy && (
                 <>
                   <ActionButtonSolid icon={CheckCircle} label="Approve Refund" onClick={() => { setApproveTarget(selected); setApproveResolution("vacant"); setApproveReason(""); }} disabled={processing === selected._id} color="emerald" />
-                  <ActionButtonSolid icon={XCircle} label="Reject Refund" onClick={() => { setRejectTarget(selected); setRejectReason(""); }} disabled={processing === selected._id} color="red" />
+                  <ActionButtonSolid icon={XCircle} label="Reject Refund" onClick={() => { setRejectTarget(selected); setRejectReason(""); setRejectResolution("keep"); }} disabled={processing === selected._id} color="red" />
                 </>
               )}
             </div>
@@ -383,7 +391,16 @@ export default function RefundsPage() {
             <div className={`border rounded-lg p-4 space-y-2 ${selectedLog.action === "refund_approved" ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
               <DetailRow label="Admin Reason" value={selectedLog.details?.adminReason} />
               {selectedLog.details?.resolution && (
-                <DetailRow label="Resolution" value={selectedLog.details.resolution === "delete" ? "Request deleted permanently" : "Reset to vacant"} />
+                <DetailRow
+                  label="Resolution"
+                  value={
+                    selectedLog.details.resolution === "delete"
+                      ? "Request deleted permanently"
+                      : selectedLog.details.resolution === "vacant"
+                        ? "Reset to vacant"
+                        : "Kept as is — no change to listing"
+                  }
+                />
               )}
               <DetailRow label="Decided By" value={selectedLog.performedBy?.name} icon={User} />
               <DetailRow label="Decided At" value={new Date(selectedLog.createdAt).toLocaleString()} icon={Calendar} />
@@ -467,16 +484,63 @@ export default function RefundsPage() {
         </div>
       )}
 
-      {/* Reject Dialog */}
+      {/* Reject Dialog — refund money is denied; listing resolution is a separate choice */}
       {rejectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/40" onClick={() => { if (!processing) { setRejectTarget(null); } }} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-slate-900 mb-2">Reject Refund Request</h2>
             <p className="text-sm text-slate-600 mb-4">
-              Rejecting the refund for <span className="font-medium text-slate-900">{rejectTarget.name}</span>. The request will stay fulfilled.
+              The platform fee will <span className="font-medium text-slate-900">not</span> be refunded for <span className="font-medium text-slate-900">{rejectTarget.name}</span>. Separately, choose what happens to the tuition listing.
             </p>
-            <div>
+            <div className="space-y-3">
+              <button
+                onClick={() => setRejectResolution("keep")}
+                disabled={!!processing}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  rejectResolution === "keep" ? "border-slate-500 bg-slate-50" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <CheckCircle size={18} className={rejectResolution === "keep" ? "text-slate-700" : "text-slate-400"} />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Keep As Is (default)</p>
+                    <p className="text-xs text-slate-500 mt-0.5">No refund, no change — teacher keeps the assignment, request stays fulfilled.</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => setRejectResolution("vacant")}
+                disabled={!!processing}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  rejectResolution === "vacant" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <RotateCcw size={18} className={rejectResolution === "vacant" ? "text-blue-600" : "text-slate-400"} />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Reset to Vacant</p>
+                    <p className="text-xs text-slate-500 mt-0.5">No refund given, but the teacher is leaving anyway — reopen for other teachers.</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => setRejectResolution("delete")}
+                disabled={!!processing}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  rejectResolution === "delete" ? "border-red-500 bg-red-50" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <Trash2 size={18} className={rejectResolution === "delete" ? "text-red-600" : "text-slate-400"} />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Delete Request Permanently</p>
+                    <p className="text-xs text-slate-500 mt-0.5">No refund given, and the parent doesn't want to continue — close and remove this tuition request.</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div className="mt-4">
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Reason <span className="text-red-500">*</span>
               </label>
@@ -491,8 +555,16 @@ export default function RefundsPage() {
               />
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => { setRejectTarget(null); setRejectReason(""); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
-              <button onClick={handleReject} disabled={!!processing || !rejectReason.trim()} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer">{processing ? "Rejecting..." : "Reject Refund"}</button>
+              <button onClick={() => { setRejectTarget(null); setRejectReason(""); setRejectResolution("keep"); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
+              <button
+                onClick={handleReject}
+                disabled={!!processing || !rejectReason.trim()}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-40 cursor-pointer ${
+                  rejectResolution === "delete" ? "bg-red-600 hover:bg-red-700" : rejectResolution === "vacant" ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-700 hover:bg-slate-800"
+                }`}
+              >
+                {processing ? "Processing..." : rejectResolution === "delete" ? "Reject & Delete" : rejectResolution === "vacant" ? "Reject & Set Vacant" : "Reject Refund"}
+              </button>
             </div>
           </div>
         </div>
@@ -532,7 +604,7 @@ export default function RefundsPage() {
                 <div className="flex gap-1.5 justify-end">
                   <ActionButton icon={Eye} label="View" onClick={() => handleView(r)} color="blue" />
                   <ActionButton icon={CheckCircle} label="Approve" onClick={() => { setApproveTarget(r); setApproveResolution("vacant"); setApproveReason(""); }} disabled={processing === r._id} color="emerald" />
-                  <ActionButton icon={XCircle} label="Reject" onClick={() => { setRejectTarget(r); setRejectReason(""); }} disabled={processing === r._id} color="red" />
+                  <ActionButton icon={XCircle} label="Reject" onClick={() => { setRejectTarget(r); setRejectReason(""); setRejectResolution("keep"); }} disabled={processing === r._id} color="red" />
                 </div>
               )},
             ]}
@@ -587,6 +659,7 @@ export default function RefundsPage() {
                 <tr className="border-b border-slate-200 bg-slate-50/50">
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tuition</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Listing</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Reason</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Rejected At</th>
                   <th></th>
@@ -600,6 +673,13 @@ export default function RefundsPage() {
                       {log.details?.tuition?.location && <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{log.details.tuition.location.split(",")[0]}</p>}
                     </td>
                     <td className="px-5 py-3.5 text-sm text-slate-600">{log.details?.teacher?.name || "—"}</td>
+                    <td className="px-5 py-3.5 text-xs">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full font-medium ${
+                        log.details?.resolution === "delete" ? "bg-red-100 text-red-700" : log.details?.resolution === "vacant" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {log.details?.resolution === "delete" ? "Deleted" : log.details?.resolution === "vacant" ? "Vacant" : "Kept As Is"}
+                      </span>
+                    </td>
                     <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.adminReason || "—"}</td>
                     <td className="px-5 py-3.5 text-xs text-slate-500">
                       <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(log.createdAt).toLocaleString()}</span>
