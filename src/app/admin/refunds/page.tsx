@@ -9,9 +9,12 @@ import {
   DollarSign,
   User,
   Phone,
+  Mail,
   Calendar,
   AlertTriangle,
   ImageIcon,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -47,6 +50,7 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 type Tab = "pending" | "approved" | "rejected";
+type Resolution = "vacant" | "delete";
 
 export default function RefundsPage() {
   const [requests, setRequests] = useState<ParentProfile[]>([]);
@@ -57,6 +61,8 @@ export default function RefundsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ParentProfile | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [approveTarget, setApproveTarget] = useState<ParentProfile | null>(null);
+  const [approveResolution, setApproveResolution] = useState<Resolution>("vacant");
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
@@ -75,7 +81,7 @@ export default function RefundsPage() {
   }, [toast]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useRealtimeRefresh(fetchAll, ["request:available", "request:fulfilled", "parent-request:status-updated"]);
+  useRealtimeRefresh(fetchAll, ["request:available", "request:fulfilled", "parent-request:status-updated", "parent-request:deleted"]);
 
   const pending = requests.filter((r) => r.refund?.requestedBy && !r.refund?.refundedBy);
   const approved = requests.filter((r) => r.refund?.refundedBy);
@@ -89,11 +95,17 @@ export default function RefundsPage() {
     }
   }, []);
 
-  const handleApprove = useCallback(async (id: string) => {
-    setProcessing(id);
+  const handleApprove = useCallback(async () => {
+    if (!approveTarget) return;
+    setProcessing(approveTarget._id);
     try {
-      await parentService.approveRefund(id);
-      toast.success("Refund approved and request reset to vacant");
+      await parentService.approveRefund(approveTarget._id, approveResolution);
+      toast.success(
+        approveResolution === "delete"
+          ? "Refund approved — tuition request closed permanently"
+          : "Refund approved — request reset to vacant",
+      );
+      setApproveTarget(null);
       setSelected(null);
       fetchAll();
     } catch {
@@ -101,7 +113,7 @@ export default function RefundsPage() {
     } finally {
       setProcessing(null);
     }
-  }, [fetchAll, toast]);
+  }, [approveTarget, approveResolution, fetchAll, toast]);
 
   const handleReject = useCallback(async () => {
     if (!rejectTarget) return;
@@ -156,12 +168,23 @@ export default function RefundsPage() {
               <DetailRow label="Duration" value={selected.duration} />
             </div>
 
+            {selected.parent && (
+              <>
+                <SectionHeader title="Parent" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <DetailRow label="Name" value={selected.parent.name} icon={User} />
+                  <DetailRow label="Email" value={selected.parent.email} icon={Mail} />
+                  <DetailRow label="Phone" value={selected.parent.phoneNumber} icon={Phone} />
+                </div>
+              </>
+            )}
+
             {selected.assignedTeacher && (
               <>
                 <SectionHeader title="Teacher" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.assignedTeacher.name} icon={User} />
-                  <DetailRow label="Email" value={selected.assignedTeacher.email} />
+                  <DetailRow label="Email" value={selected.assignedTeacher.email} icon={Mail} />
                   <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber} icon={Phone} />
                   {selected.teacherProfile?.gender && <DetailRow label="Gender" value={selected.teacherProfile.gender} />}
                 </div>
@@ -203,7 +226,7 @@ export default function RefundsPage() {
               <>
                 <SectionHeader title="Refund Resolution" />
                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-                  <DetailRow label="Reason" value={selected.refund.reason} />
+                  <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
                   <DetailRow label="Refunded By" value={selected.refund.refundedBy?.name} icon={User} />
                   <DetailRow label="Refunded At" value={selected.refund.refundedAt ? new Date(selected.refund.refundedAt).toLocaleString() : undefined} icon={Calendar} />
                 </div>
@@ -214,7 +237,7 @@ export default function RefundsPage() {
               <ActionButton icon={Eye} label="Close" onClick={() => setSelected(null)} color="slate" />
               {selected.refund?.requestedBy && !selected.refund?.refundedBy && (
                 <>
-                  <ActionButtonSolid icon={CheckCircle} label="Approve Refund" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+                  <ActionButtonSolid icon={CheckCircle} label="Approve Refund" onClick={() => { setApproveTarget(selected); setApproveResolution("vacant"); }} disabled={processing === selected._id} color="emerald" />
                   <ActionButtonSolid icon={XCircle} label="Reject Refund" onClick={() => { setRejectTarget(selected); setRejectReason(""); }} disabled={processing === selected._id} color="red" />
                 </>
               )}
@@ -222,6 +245,63 @@ export default function RefundsPage() {
           </div>
         )}
       </Modal>
+
+      {/* Approve Dialog — choose resolution after calling the parent */}
+      {approveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => { if (!processing) { setApproveTarget(null); } }} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">Approve Refund</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Call <span className="font-medium text-slate-900">{approveTarget.parent?.name || "the parent"}</span> first to confirm whether they want to continue with aGrade. Then choose what happens to <span className="font-medium text-slate-900">{approveTarget.name}</span>&apos;s tuition request.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => setApproveResolution("vacant")}
+                disabled={!!processing}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  approveResolution === "vacant" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <RotateCcw size={18} className={approveResolution === "vacant" ? "text-blue-600" : "text-slate-400"} />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Reset to Vacant</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Parent still wants a tutor — reopen this request so other teachers can apply.</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => setApproveResolution("delete")}
+                disabled={!!processing}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  approveResolution === "delete" ? "border-red-500 bg-red-50" : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <Trash2 size={18} className={approveResolution === "delete" ? "text-red-600" : "text-slate-400"} />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Delete Request Permanently</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Parent does not want to continue with aGrade — close and remove this tuition request for good.</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setApproveTarget(null)} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
+              <button
+                onClick={handleApprove}
+                disabled={!!processing}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-40 cursor-pointer ${
+                  approveResolution === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {processing ? "Processing..." : approveResolution === "delete" ? "Approve & Delete" : "Approve & Set Vacant"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reject Dialog */}
       {rejectTarget && (
@@ -264,6 +344,12 @@ export default function RefundsPage() {
                   <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{r.location?.split(",")[0] || "—"}</p>
                 </div>
               )},
+              { key: "parent", header: "Parent", render: (r) => (
+                <div>
+                  <span className="text-slate-900 font-medium">{r.parent?.name || "—"}</span>
+                  <p className="text-slate-400 text-xs flex items-center gap-1">{r.parent?.phoneNumber ? (<><Phone size={11} />{r.parent.phoneNumber}</>) : "—"}</p>
+                </div>
+              )},
               { key: "requestedBy", header: "Requested By", render: (r) => (
                 <div>
                   <span className="text-slate-900 font-medium">{r.refund?.requestedBy?.name || "—"}</span>
@@ -271,10 +357,7 @@ export default function RefundsPage() {
                 </div>
               )},
               { key: "reason", header: "Reason", render: (r) => (
-                <span className="text-slate-600 text-xs max-w-[220px] block truncate" title={r.refund?.reason || r.refund?.reasons}>{r.refund?.reason || r.refund?.reasons || "—"}</span>
-              )},
-              { key: "phone", header: "Phone", render: (r) => (
-                <span className="inline-flex items-center gap-1 text-slate-500 text-xs">{r.refund?.phoneNumber ? (<><Phone size={12} />{r.refund.phoneNumber}</>) : "—"}</span>
+                <span className="text-slate-600 text-xs max-w-65 block whitespace-normal">{r.refund?.reason || r.refund?.reasons || "—"}</span>
               )},
               { key: "requestedAt", header: "Requested At", render: (r) => (
                 <span className="inline-flex items-center gap-1 text-slate-500 text-xs"><Calendar size={12} />{r.refund?.requestedAt ? new Date(r.refund.requestedAt).toLocaleDateString() : "—"}</span>
@@ -282,7 +365,7 @@ export default function RefundsPage() {
               { key: "actions", header: "", render: (r) => (
                 <div className="flex gap-1.5 justify-end">
                   <ActionButton icon={Eye} label="View" onClick={() => handleView(r)} color="blue" />
-                  <ActionButton icon={CheckCircle} label="Approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
+                  <ActionButton icon={CheckCircle} label="Approve" onClick={() => { setApproveTarget(r); setApproveResolution("vacant"); }} disabled={processing === r._id} color="emerald" />
                   <ActionButton icon={XCircle} label="Reject" onClick={() => { setRejectTarget(r); setRejectReason(""); }} disabled={processing === r._id} color="red" />
                 </div>
               )},
@@ -300,9 +383,15 @@ export default function RefundsPage() {
                   <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{r.location?.split(",")[0] || "—"}</p>
                 </div>
               )},
+              { key: "parent", header: "Parent", render: (r) => (
+                <div>
+                  <span className="text-slate-900 font-medium">{r.parent?.name || "—"}</span>
+                  <p className="text-slate-400 text-xs flex items-center gap-1">{r.parent?.phoneNumber ? (<><Phone size={11} />{r.parent.phoneNumber}</>) : "—"}</p>
+                </div>
+              )},
               { key: "requestedBy", header: "Requested By", render: (r) => <span className="text-slate-600 text-xs">{r.refund?.requestedBy?.name || "Admin initiated"}</span> },
               { key: "refundedBy", header: "Refunded By", render: (r) => <span className="text-slate-900 text-xs font-medium">{r.refund?.refundedBy?.name || "—"}</span> },
-              { key: "reason", header: "Reason", render: (r) => <span className="text-slate-600 text-xs max-w-[220px] block truncate" title={r.refund?.reason}>{r.refund?.reason || "—"}</span> },
+              { key: "reason", header: "Reason", render: (r) => <span className="text-slate-600 text-xs max-w-65 block whitespace-normal">{r.refund?.reason || r.refund?.reasons || "—"}</span> },
               { key: "refundedAt", header: "Refunded At", render: (r) => (
                 <span className="inline-flex items-center gap-1 text-slate-500 text-xs"><Calendar size={12} />{r.refund?.refundedAt ? new Date(r.refund.refundedAt).toLocaleDateString() : "—"}</span>
               )},
@@ -337,7 +426,7 @@ export default function RefundsPage() {
                         {req?.location && <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{req.location.split(",")[0]}</p>}
                       </td>
                       <td className="px-5 py-3.5 text-sm text-slate-600">{log.performedBy?.name || "—"}</td>
-                      <td className="px-5 py-3.5 text-sm text-slate-600 max-w-[260px] truncate" title={log.details?.reason}>
+                      <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">
                         {log.details?.reason || <span className="text-slate-300">No reason given</span>}
                       </td>
                       <td className="px-5 py-3.5 text-xs text-slate-500">

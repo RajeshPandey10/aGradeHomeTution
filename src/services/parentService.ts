@@ -86,8 +86,8 @@ export const parentService = {
   refund: (id: string, reason: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/requests/${id}/refund`, { reason })),
 
-  approveRefund: (id: string) =>
-    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`)),
+  approveRefund: (id: string, resolution: "vacant" | "delete") =>
+    handleRequest<ParentProfile & { deleted?: boolean }>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`, { resolution })),
 
   rejectRefund: (id: string, reason?: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/reject-refund`, { reason })),

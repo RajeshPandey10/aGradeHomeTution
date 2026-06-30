@@ -334,7 +334,7 @@ export default function ParentRequestsPage() {
               <>
                 <SectionHeader title="Refund Info" />
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <DetailRow label="Reason" value={selected.refund.reason} />
+                  <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
                   <DetailRow label="Refunded By" value={selected.refund.refundedBy?.name} />
                   <DetailRow label="Refunded At" value={selected.refund.refundedAt ? new Date(selected.refund.refundedAt).toLocaleString() : undefined} />
                 </div>
