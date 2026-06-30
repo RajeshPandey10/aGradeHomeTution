@@ -11,10 +11,11 @@ import {
   Phone,
   Mail,
   Calendar,
-  AlertTriangle,
   ImageIcon,
   RotateCcw,
   Trash2,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
@@ -24,11 +25,34 @@ import { ActionButton, ActionButtonSolid, Loading, EmptyState } from "@/componen
 import { Modal } from "@/components/admin/Modal";
 import api from "@/lib/axios";
 
-interface RejectedRefundLog {
+interface TeacherProfileSnapshot {
+  name?: string;
+  address?: string;
+  phone?: string;
+  gender?: string;
+  academicQualification?: string;
+  experience?: string;
+  about?: string;
+  cv?: string;
+  identification?: string[];
+  status?: string;
+}
+
+interface RefundSnapshot {
+  tuition?: { name?: string; location?: string; salary?: string; duration?: string };
+  parent?: { _id: string; name?: string; email?: string; phoneNumber?: string } | null;
+  teacher?: { _id: string; name?: string; email?: string; phoneNumber?: string; profile?: TeacherProfileSnapshot | null } | null;
+  originalRefundRequest?: { reason?: string; reasons?: string; phoneNumber?: string; qrImage?: string; requestedAt?: string };
+  resolution?: "vacant" | "delete";
+  adminReason?: string;
+}
+
+interface RefundLog {
   _id: string;
+  action: "refund_approved" | "refund_rejected";
   performedBy: { _id: string; name: string; email: string } | null;
   targetId: string;
-  details?: { reason?: string };
+  details?: RefundSnapshot;
   createdAt: string;
 }
 
@@ -49,30 +73,86 @@ function SectionHeader({ title }: { title: string }) {
   return <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-600 border-b border-slate-200 pb-1 pt-3">{title}</h3>;
 }
 
+function CvLink({ url }: { url?: string | null }) {
+  if (!url) return null;
+  return (
+    <div>
+      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">CV</span>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium">
+        <FileText size={14} />
+        View CV
+        <ExternalLink size={12} />
+      </a>
+    </div>
+  );
+}
+
+function IdentificationLinks({ urls }: { urls?: string[] | null }) {
+  if (!urls || urls.length === 0) return null;
+  return (
+    <div>
+      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Identification Documents</span>
+      <div className="flex flex-wrap gap-2 mt-1">
+        {urls.map((url, i) => (
+          <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block">
+            <img src={url} alt={`ID ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-slate-200 hover:border-blue-400 transition-colors" />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TeacherProfileSection({ name, email, phoneNumber, profile }: { name?: string; email?: string; phoneNumber?: string; profile?: TeacherProfileSnapshot | null }) {
+  return (
+    <>
+      <SectionHeader title="Teacher" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <DetailRow label="Name" value={name} icon={User} />
+        <DetailRow label="Email" value={email} icon={Mail} />
+        <DetailRow label="Phone" value={phoneNumber || profile?.phone} icon={Phone} />
+        <DetailRow label="Gender" value={profile?.gender} />
+        <DetailRow label="Qualification" value={profile?.academicQualification} />
+        <DetailRow label="Experience" value={profile?.experience} />
+      </div>
+      <DetailRow label="About" value={profile?.about} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <CvLink url={profile?.cv} />
+      </div>
+      <IdentificationLinks urls={profile?.identification} />
+    </>
+  );
+}
+
 type Tab = "pending" | "approved" | "rejected";
 type Resolution = "vacant" | "delete";
 
 export default function RefundsPage() {
   const [requests, setRequests] = useState<ParentProfile[]>([]);
-  const [rejectedLogs, setRejectedLogs] = useState<RejectedRefundLog[]>([]);
+  const [approvedLogs, setApprovedLogs] = useState<RefundLog[]>([]);
+  const [rejectedLogs, setRejectedLogs] = useState<RefundLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pending");
   const [selected, setSelected] = useState<ParentProfile | null>(null);
+  const [selectedLog, setSelectedLog] = useState<RefundLog | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ParentProfile | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [approveTarget, setApproveTarget] = useState<ParentProfile | null>(null);
   const [approveResolution, setApproveResolution] = useState<Resolution>("vacant");
+  const [approveReason, setApproveReason] = useState("");
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
     try {
-      const [requestsRes, logsRes] = await Promise.all([
+      const [requestsRes, approvedRes, rejectedRes] = await Promise.all([
         parentService.getRequests(),
+        api.get("/api/admin/audit-logs", { params: { action: "refund_approved", limit: 50 } }),
         api.get("/api/admin/audit-logs", { params: { action: "refund_rejected", limit: 50 } }),
       ]);
       setRequests(requestsRes.data || []);
-      setRejectedLogs(logsRes.data.data?.logs || []);
+      setApprovedLogs(approvedRes.data.data?.logs || []);
+      setRejectedLogs(rejectedRes.data.data?.logs || []);
     } catch {
       toast.error("Failed to load refund requests");
     } finally {
@@ -84,7 +164,6 @@ export default function RefundsPage() {
   useRealtimeRefresh(fetchAll, ["request:available", "request:fulfilled", "parent-request:status-updated", "parent-request:deleted"]);
 
   const pending = requests.filter((r) => r.refund?.requestedBy && !r.refund?.refundedBy);
-  const approved = requests.filter((r) => r.refund?.refundedBy);
 
   const handleView = useCallback(async (r: ParentProfile) => {
     try {
@@ -96,16 +175,17 @@ export default function RefundsPage() {
   }, []);
 
   const handleApprove = useCallback(async () => {
-    if (!approveTarget) return;
+    if (!approveTarget || !approveReason.trim()) return;
     setProcessing(approveTarget._id);
     try {
-      await parentService.approveRefund(approveTarget._id, approveResolution);
+      await parentService.approveRefund(approveTarget._id, approveResolution, approveReason.trim());
       toast.success(
         approveResolution === "delete"
           ? "Refund approved — tuition request closed permanently"
           : "Refund approved — request reset to vacant",
       );
       setApproveTarget(null);
+      setApproveReason("");
       setSelected(null);
       fetchAll();
     } catch {
@@ -113,13 +193,13 @@ export default function RefundsPage() {
     } finally {
       setProcessing(null);
     }
-  }, [approveTarget, approveResolution, fetchAll, toast]);
+  }, [approveTarget, approveResolution, approveReason, fetchAll, toast]);
 
   const handleReject = useCallback(async () => {
-    if (!rejectTarget) return;
+    if (!rejectTarget || !rejectReason.trim()) return;
     setProcessing(rejectTarget._id);
     try {
-      await parentService.rejectRefund(rejectTarget._id, rejectReason.trim() || undefined);
+      await parentService.rejectRefund(rejectTarget._id, rejectReason.trim());
       toast.success("Refund request rejected");
       setRejectTarget(null);
       setRejectReason("");
@@ -134,7 +214,7 @@ export default function RefundsPage() {
 
   const tabs: { label: string; value: Tab; count: number }[] = [
     { label: "Pending", value: "pending", count: pending.length },
-    { label: "Approved", value: "approved", count: approved.length },
+    { label: "Approved", value: "approved", count: approvedLogs.length },
     { label: "Rejected", value: "rejected", count: rejectedLogs.length },
   ];
 
@@ -156,7 +236,7 @@ export default function RefundsPage() {
         ))}
       </div>
 
-      {/* Detail Modal */}
+      {/* Pending Detail Modal (live data) */}
       <Modal open={!!selected} onClose={() => setSelected(null)} title="Refund Details" wide>
         {selected && (
           <div className="space-y-3 text-sm max-h-[75vh] overflow-y-auto pr-1">
@@ -180,15 +260,12 @@ export default function RefundsPage() {
             )}
 
             {selected.assignedTeacher && (
-              <>
-                <SectionHeader title="Teacher" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <DetailRow label="Name" value={selected.assignedTeacher.name} icon={User} />
-                  <DetailRow label="Email" value={selected.assignedTeacher.email} icon={Mail} />
-                  <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber} icon={Phone} />
-                  {selected.teacherProfile?.gender && <DetailRow label="Gender" value={selected.teacherProfile.gender} />}
-                </div>
-              </>
+              <TeacherProfileSection
+                name={selected.assignedTeacher.name}
+                email={selected.assignedTeacher.email}
+                phoneNumber={selected.assignedTeacher.phoneNumber}
+                profile={selected.teacherProfile}
+              />
             )}
 
             {selected.payment && selected.payment.grossAmount > 0 && (
@@ -215,20 +292,11 @@ export default function RefundsPage() {
                   {selected.refund.qrImage && (
                     <div>
                       <span className="font-medium text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><ImageIcon size={12} /> QR Code</span>
-                      <img src={selected.refund.qrImage} alt="Refund QR" className="mt-1 w-40 h-40 object-contain rounded-lg border border-amber-200" />
+                      <a href={selected.refund.qrImage} target="_blank" rel="noopener noreferrer">
+                        <img src={selected.refund.qrImage} alt="Refund QR" className="mt-1 w-40 h-40 object-contain rounded-lg border border-amber-200 hover:border-blue-400 transition-colors" />
+                      </a>
                     </div>
                   )}
-                </div>
-              </>
-            )}
-
-            {selected.refund?.refundedBy && (
-              <>
-                <SectionHeader title="Refund Resolution" />
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-                  <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
-                  <DetailRow label="Refunded By" value={selected.refund.refundedBy?.name} icon={User} />
-                  <DetailRow label="Refunded At" value={selected.refund.refundedAt ? new Date(selected.refund.refundedAt).toLocaleString() : undefined} icon={Calendar} />
                 </div>
               </>
             )}
@@ -237,7 +305,7 @@ export default function RefundsPage() {
               <ActionButton icon={Eye} label="Close" onClick={() => setSelected(null)} color="slate" />
               {selected.refund?.requestedBy && !selected.refund?.refundedBy && (
                 <>
-                  <ActionButtonSolid icon={CheckCircle} label="Approve Refund" onClick={() => { setApproveTarget(selected); setApproveResolution("vacant"); }} disabled={processing === selected._id} color="emerald" />
+                  <ActionButtonSolid icon={CheckCircle} label="Approve Refund" onClick={() => { setApproveTarget(selected); setApproveResolution("vacant"); setApproveReason(""); }} disabled={processing === selected._id} color="emerald" />
                   <ActionButtonSolid icon={XCircle} label="Reject Refund" onClick={() => { setRejectTarget(selected); setRejectReason(""); }} disabled={processing === selected._id} color="red" />
                 </>
               )}
@@ -246,7 +314,79 @@ export default function RefundsPage() {
         )}
       </Modal>
 
-      {/* Approve Dialog — choose resolution after calling the parent */}
+      {/* Historical Detail Modal (approved/rejected snapshot) */}
+      <Modal open={!!selectedLog} onClose={() => setSelectedLog(null)} title={selectedLog?.action === "refund_approved" ? "Approved Refund Details" : "Rejected Refund Details"} wide>
+        {selectedLog && (
+          <div className="space-y-3 text-sm max-h-[75vh] overflow-y-auto pr-1">
+            {selectedLog.details?.tuition && (
+              <>
+                <SectionHeader title="Tuition" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <DetailRow label="Name" value={selectedLog.details.tuition.name} icon={User} />
+                  <DetailRow label="Location" value={selectedLog.details.tuition.location} icon={MapPin} />
+                  <DetailRow label="Salary" value={selectedLog.details.tuition.salary ? `Rs. ${selectedLog.details.tuition.salary}` : undefined} icon={DollarSign} />
+                  <DetailRow label="Duration" value={selectedLog.details.tuition.duration} />
+                </div>
+              </>
+            )}
+
+            {selectedLog.details?.parent && (
+              <>
+                <SectionHeader title="Parent" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <DetailRow label="Name" value={selectedLog.details.parent.name} icon={User} />
+                  <DetailRow label="Email" value={selectedLog.details.parent.email} icon={Mail} />
+                  <DetailRow label="Phone" value={selectedLog.details.parent.phoneNumber} icon={Phone} />
+                </div>
+              </>
+            )}
+
+            {selectedLog.details?.teacher && (
+              <TeacherProfileSection
+                name={selectedLog.details.teacher.name}
+                email={selectedLog.details.teacher.email}
+                phoneNumber={selectedLog.details.teacher.phoneNumber}
+                profile={selectedLog.details.teacher.profile}
+              />
+            )}
+
+            {selectedLog.details?.originalRefundRequest && (
+              <>
+                <SectionHeader title="Original Refund Request" />
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                  <DetailRow label="Reason" value={selectedLog.details.originalRefundRequest.reason || selectedLog.details.originalRefundRequest.reasons} />
+                  {selectedLog.details.originalRefundRequest.phoneNumber && <DetailRow label="Phone" value={selectedLog.details.originalRefundRequest.phoneNumber} icon={Phone} />}
+                  <DetailRow label="Requested At" value={selectedLog.details.originalRefundRequest.requestedAt ? new Date(selectedLog.details.originalRefundRequest.requestedAt).toLocaleString() : undefined} icon={Calendar} />
+                  {selectedLog.details.originalRefundRequest.qrImage && (
+                    <div>
+                      <span className="font-medium text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><ImageIcon size={12} /> QR Code</span>
+                      <a href={selectedLog.details.originalRefundRequest.qrImage} target="_blank" rel="noopener noreferrer">
+                        <img src={selectedLog.details.originalRefundRequest.qrImage} alt="Refund QR" className="mt-1 w-40 h-40 object-contain rounded-lg border border-amber-200 hover:border-blue-400 transition-colors" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <SectionHeader title={selectedLog.action === "refund_approved" ? "Approval Decision" : "Rejection Decision"} />
+            <div className={`border rounded-lg p-4 space-y-2 ${selectedLog.action === "refund_approved" ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+              <DetailRow label="Admin Reason" value={selectedLog.details?.adminReason} />
+              {selectedLog.details?.resolution && (
+                <DetailRow label="Resolution" value={selectedLog.details.resolution === "delete" ? "Request deleted permanently" : "Reset to vacant"} />
+              )}
+              <DetailRow label="Decided By" value={selectedLog.performedBy?.name} icon={User} />
+              <DetailRow label="Decided At" value={new Date(selectedLog.createdAt).toLocaleString()} icon={Calendar} />
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-slate-200">
+              <ActionButton icon={Eye} label="Close" onClick={() => setSelectedLog(null)} color="slate" />
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Approve Dialog — choose resolution + reason after calling the parent */}
       {approveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/40" onClick={() => { if (!processing) { setApproveTarget(null); } }} />
@@ -287,11 +427,25 @@ export default function RefundsPage() {
                 </div>
               </button>
             </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={approveReason}
+                onChange={(e) => setApproveReason(e.target.value)}
+                placeholder="e.g. Confirmed with parent — they will look for a new tutor"
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                disabled={!!processing}
+                autoFocus
+              />
+            </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setApproveTarget(null)} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
+              <button onClick={() => { setApproveTarget(null); setApproveReason(""); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
               <button
                 onClick={handleApprove}
-                disabled={!!processing}
+                disabled={!!processing || !approveReason.trim()}
                 className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-40 cursor-pointer ${
                   approveResolution === "delete" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
                 }`}
@@ -313,7 +467,9 @@ export default function RefundsPage() {
               Rejecting the refund for <span className="font-medium text-slate-900">{rejectTarget.name}</span>. The request will stay fulfilled.
             </p>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Reason (optional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Reason <span className="text-red-500">*</span>
+              </label>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
@@ -326,7 +482,7 @@ export default function RefundsPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => { setRejectTarget(null); setRejectReason(""); }} disabled={!!processing} className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer">Cancel</button>
-              <button onClick={handleReject} disabled={!!processing} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer">{processing ? "Rejecting..." : "Reject Refund"}</button>
+              <button onClick={handleReject} disabled={!!processing || !rejectReason.trim()} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer">{processing ? "Rejecting..." : "Reject Refund"}</button>
             </div>
           </div>
         </div>
@@ -365,7 +521,7 @@ export default function RefundsPage() {
               { key: "actions", header: "", render: (r) => (
                 <div className="flex gap-1.5 justify-end">
                   <ActionButton icon={Eye} label="View" onClick={() => handleView(r)} color="blue" />
-                  <ActionButton icon={CheckCircle} label="Approve" onClick={() => { setApproveTarget(r); setApproveResolution("vacant"); }} disabled={processing === r._id} color="emerald" />
+                  <ActionButton icon={CheckCircle} label="Approve" onClick={() => { setApproveTarget(r); setApproveResolution("vacant"); setApproveReason(""); }} disabled={processing === r._id} color="emerald" />
                   <ActionButton icon={XCircle} label="Reject" onClick={() => { setRejectTarget(r); setRejectReason(""); }} disabled={processing === r._id} color="red" />
                 </div>
               )},
@@ -374,35 +530,44 @@ export default function RefundsPage() {
           />
         )
       ) : tab === "approved" ? (
-        approved.length === 0 ? <EmptyState message="No approved refunds yet" /> : (
-          <DataTable
-            columns={[
-              { key: "name", header: "Tuition", render: (r) => (
-                <div>
-                  <span className="font-medium text-slate-900">{r.name}</span>
-                  <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{r.location?.split(",")[0] || "—"}</p>
-                </div>
-              )},
-              { key: "parent", header: "Parent", render: (r) => (
-                <div>
-                  <span className="text-slate-900 font-medium">{r.parent?.name || "—"}</span>
-                  <p className="text-slate-400 text-xs flex items-center gap-1">{r.parent?.phoneNumber ? (<><Phone size={11} />{r.parent.phoneNumber}</>) : "—"}</p>
-                </div>
-              )},
-              { key: "requestedBy", header: "Requested By", render: (r) => <span className="text-slate-600 text-xs">{r.refund?.requestedBy?.name || "Admin initiated"}</span> },
-              { key: "refundedBy", header: "Refunded By", render: (r) => <span className="text-slate-900 text-xs font-medium">{r.refund?.refundedBy?.name || "—"}</span> },
-              { key: "reason", header: "Reason", render: (r) => <span className="text-slate-600 text-xs max-w-65 block whitespace-normal">{r.refund?.reason || r.refund?.reasons || "—"}</span> },
-              { key: "refundedAt", header: "Refunded At", render: (r) => (
-                <span className="inline-flex items-center gap-1 text-slate-500 text-xs"><Calendar size={12} />{r.refund?.refundedAt ? new Date(r.refund.refundedAt).toLocaleDateString() : "—"}</span>
-              )},
-              { key: "actions", header: "", render: (r) => (
-                <div className="flex gap-1.5 justify-end">
-                  <ActionButton icon={Eye} label="View" onClick={() => handleView(r)} color="blue" />
-                </div>
-              )},
-            ]}
-            data={approved}
-          />
+        approvedLogs.length === 0 ? <EmptyState message="No approved refunds yet" /> : (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/50">
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tuition</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Resolution</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Reason</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved At</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {approvedLogs.map((log) => (
+                  <tr key={log._id} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-3.5 text-sm">
+                      <span className="font-medium text-slate-900">{log.details?.tuition?.name || "—"}</span>
+                      {log.details?.tuition?.location && <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{log.details.tuition.location.split(",")[0]}</p>}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-600">{log.details?.teacher?.name || "—"}</td>
+                    <td className="px-5 py-3.5 text-xs">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full font-medium ${log.details?.resolution === "delete" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+                        {log.details?.resolution === "delete" ? "Deleted" : "Vacant"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.adminReason || "—"}</td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(log.createdAt).toLocaleDateString()}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <ActionButton icon={Eye} label="View" onClick={() => setSelectedLog(log)} color="blue" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )
       ) : (
         rejectedLogs.length === 0 ? <EmptyState message="No rejected refund requests" /> : (
@@ -411,30 +576,29 @@ export default function RefundsPage() {
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/50">
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tuition</th>
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Rejected By</th>
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Reason</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Rejected At</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rejectedLogs.map((log) => {
-                  const req = requests.find((r) => r._id === log.targetId);
-                  return (
-                    <tr key={log._id} className="hover:bg-slate-50/50">
-                      <td className="px-5 py-3.5 text-sm">
-                        <span className="font-medium text-slate-900">{req?.name || "Request deleted"}</span>
-                        {req?.location && <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{req.location.split(",")[0]}</p>}
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-slate-600">{log.performedBy?.name || "—"}</td>
-                      <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">
-                        {log.details?.reason || <span className="text-slate-300">No reason given</span>}
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-slate-500">
-                        <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(log.createdAt).toLocaleString()}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {rejectedLogs.map((log) => (
+                  <tr key={log._id} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-3.5 text-sm">
+                      <span className="font-medium text-slate-900">{log.details?.tuition?.name || "—"}</span>
+                      {log.details?.tuition?.location && <p className="text-slate-400 text-xs flex items-center gap-1"><MapPin size={11} />{log.details.tuition.location.split(",")[0]}</p>}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-600">{log.details?.teacher?.name || "—"}</td>
+                    <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.adminReason || "—"}</td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(log.createdAt).toLocaleString()}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <ActionButton icon={Eye} label="View" onClick={() => setSelectedLog(log)} color="blue" />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

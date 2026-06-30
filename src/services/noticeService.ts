@@ -7,6 +7,7 @@ export interface Notice {
   subtitle?: string;
   description?: string;
   images?: string[];
+  showAsPopup?: boolean;
   createdAt?: string;
 }
 
@@ -17,10 +18,10 @@ export const noticeService = {
   getById: (id: string) =>
     handleRequest<Notice>(() => api.get(`/api/public/notices/${id}`)),
 
-  create: (data: { title: string; subtitle?: string; description?: string; images?: string[] }) =>
+  create: (data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean }) =>
     handleRequest<Notice>(() => api.post("/api/admin/notices", data)),
 
-  update: (id: string, data: { title: string; subtitle?: string; description?: string; images?: string[] }) =>
+  update: (id: string, data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean }) =>
     handleRequest<Notice>(() => api.put(`/api/admin/notices/${id}`, data)),
 
   delete: (id: string) =>

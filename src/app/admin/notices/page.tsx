@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaphone } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
@@ -18,6 +18,7 @@ export default function NoticesPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
+  const [showAsPopup, setShowAsPopup] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -48,6 +49,7 @@ export default function NoticesPage() {
     setTitle("");
     setSubtitle("");
     setDescription("");
+    setShowAsPopup(false);
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages([]);
@@ -59,6 +61,7 @@ export default function NoticesPage() {
     setTitle(n.title);
     setSubtitle(n.subtitle || "");
     setDescription(n.description || "");
+    setShowAsPopup(n.showAsPopup || false);
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages(n.images || []);
@@ -102,10 +105,10 @@ export default function NoticesPage() {
       }
 
       if (editId) {
-        await noticeService.update(editId, { title, subtitle, description, images: allImages });
+        await noticeService.update(editId, { title, subtitle, description, images: allImages, showAsPopup });
         toast.success("Notice updated successfully");
       } else {
-        await noticeService.create({ title, subtitle, description, images: allImages });
+        await noticeService.create({ title, subtitle, description, images: allImages, showAsPopup });
         toast.success("Notice created successfully");
       }
       setModalOpen(false);
@@ -116,7 +119,7 @@ export default function NoticesPage() {
     } finally {
       setSaving(false);
     }
-  }, [title, subtitle, description, existingImages, imageFiles, editId, fetch, toast]);
+  }, [title, subtitle, description, showAsPopup, existingImages, imageFiles, editId, fetch, toast]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -192,6 +195,22 @@ export default function NoticesPage() {
               />
             )}
           </div>
+
+          <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={showAsPopup}
+              onChange={(e) => setShowAsPopup(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <div className="flex items-center gap-2">
+              <Megaphone size={16} className="text-slate-400" />
+              <div>
+                <p className="text-sm font-medium text-slate-900">Show as Popup</p>
+                <p className="text-xs text-slate-500">When enabled, this notice appears as a popup when the app starts.</p>
+              </div>
+            </div>
+          </label>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Images</label>
@@ -291,6 +310,15 @@ export default function NoticesPage() {
                   <span className="text-slate-300">—</span>
                 )}
               </div>
+            )},
+            { key: "showAsPopup", header: "Popup", render: (n) => (
+              n.showAsPopup ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                  <Megaphone size={11} /> On
+                </span>
+              ) : (
+                <span className="text-slate-300 text-xs">Off</span>
+              )
             )},
             { key: "actions", header: "", render: (n) => (
               <div className="flex gap-1.5 justify-end">

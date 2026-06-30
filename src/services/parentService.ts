@@ -63,6 +63,8 @@ export interface ParentProfile {
     academicQualification?: string;
     experience?: string;
     about?: string;
+    cv?: string;
+    identification?: string[];
     status?: string;
   };
 }
@@ -86,10 +88,10 @@ export const parentService = {
   refund: (id: string, reason: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/requests/${id}/refund`, { reason })),
 
-  approveRefund: (id: string, resolution: "vacant" | "delete") =>
-    handleRequest<ParentProfile & { deleted?: boolean }>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`, { resolution })),
+  approveRefund: (id: string, resolution: "vacant" | "delete", reason: string) =>
+    handleRequest<ParentProfile & { deleted?: boolean }>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`, { resolution, reason })),
 
-  rejectRefund: (id: string, reason?: string) =>
+  rejectRefund: (id: string, reason: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/reject-refund`, { reason })),
 
   update: (id: string, data: Partial<ParentProfile>) =>
