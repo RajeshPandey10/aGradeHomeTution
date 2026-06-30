@@ -145,7 +145,8 @@ function TeacherProfileSection({ name, email, phoneNumber, profile, onZoom }: { 
 }
 
 type Tab = "pending" | "approved" | "rejected";
-type Resolution = "vacant" | "delete";
+type ApproveResolution = "vacant" | "delete";
+type RejectResolution = "keep" | "vacant" | "delete";
 
 export default function RefundsPage() {
   const [requests, setRequests] = useState<ParentProfile[]>([]);

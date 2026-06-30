@@ -91,8 +91,8 @@ export const parentService = {
   approveRefund: (id: string, resolution: "vacant" | "delete", reason: string) =>
     handleRequest<ParentProfile & { deleted?: boolean }>(() => api.post(`/api/admin/parent-requests/${id}/approve-refund`, { resolution, reason })),
 
-  rejectRefund: (id: string, reason: string) =>
-    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/reject-refund`, { reason })),
+  rejectRefund: (id: string, reason: string, resolution: "keep" | "vacant" | "delete" = "keep") =>
+    handleRequest<ParentProfile & { deleted?: boolean }>(() => api.post(`/api/admin/parent-requests/${id}/reject-refund`, { reason, resolution })),
 
   update: (id: string, data: Partial<ParentProfile>) =>
     handleRequest<ParentProfile>(() => api.put(`/api/parent/parent-request/${id}`, data)),
