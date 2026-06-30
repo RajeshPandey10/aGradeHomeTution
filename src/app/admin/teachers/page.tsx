@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Calendar, ShieldCheck, User, Trash2 } from "lucide-react";
+import { Mail, Phone, Calendar, ShieldCheck, User, Trash2 } from "lucide-react";
 import { teacherService, TeacherProfile } from "@/services/teacherService";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
@@ -64,6 +64,9 @@ export default function TeachersPage() {
             { key: "name", header: "Name", render: (t) => <span className="font-medium text-slate-900">{t.name || t.user?.name}</span> },
             { key: "email", header: "Email", render: (t) => (
               <span className="inline-flex items-center gap-1.5 text-slate-500"><Mail size={14} />{t.user?.email || "—"}</span>
+            )},
+            { key: "phone", header: "Phone", render: (t) => (
+              <span className="inline-flex items-center gap-1.5 text-slate-500"><Phone size={14} />{t.phone || t.user?.phoneNumber || "Not provided"}</span>
             )},
             { key: "gender", header: "Gender", render: (t) => (
               <span className="inline-flex items-center gap-1.5 text-slate-500"><User size={14} />{t.gender || "—"}</span>

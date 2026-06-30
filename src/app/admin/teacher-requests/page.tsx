@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle, XCircle, Eye, ExternalLink, FileText, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, FileText, ArrowLeft, Loader2, AlertTriangle, Phone } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { teacherService, TeacherProfile } from "@/services/teacherService";
 import { useToast } from "@/hooks/useToast";
@@ -125,7 +125,7 @@ export default function TeacherRequestsPage() {
             {[
               ["Name", selected.name || selected.user?.name],
               ["Email", selected.user?.email],
-              ["Phone", selected.phone || selected.user?.phoneNumber],
+              ["Phone", selected.phone || selected.user?.phoneNumber || "Not provided"],
               ["Gender", selected.gender],
               ["Address", selected.address],
               ["Qualification", selected.academicQualification],
@@ -134,7 +134,10 @@ export default function TeacherRequestsPage() {
             ].filter(([, v]) => v).map(([label, value]) => (
               <div key={label as string}>
                 <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">{label as string}</span>
-                <p className="text-slate-900 mt-0.5">{value as string}</p>
+                <p className={`mt-0.5 ${value === "Not provided" ? "text-slate-400 italic" : "text-slate-900"}`}>
+                  {label === "Phone" && <Phone size={13} className="inline mr-1.5 -mt-0.5" />}
+                  {value as string}
+                </p>
               </div>
             ))}
 
@@ -298,6 +301,9 @@ export default function TeacherRequestsPage() {
           columns={[
             { key: "name", header: "Name", render: (r) => <span className="font-medium text-slate-900">{r.name || r.user?.name}</span> },
             { key: "email", header: "Email", render: (r) => <span className="text-slate-500">{r.user?.email || "—"}</span> },
+            { key: "phone", header: "Phone", render: (r) => (
+              <span className="inline-flex items-center gap-1.5 text-slate-500"><Phone size={13} />{r.phone || r.user?.phoneNumber || "Not provided"}</span>
+            )},
             { key: "qualification", header: "Qualification", render: (r) => (
               <span className="text-slate-500 max-w-55 inline-block truncate">{r.academicQualification || "—"}</span>
             )},

@@ -255,7 +255,7 @@ export default function ParentRequestsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.parent.name} icon={User} />
                   <DetailRow label="Email" value={selected.parent.email} />
-                  <DetailRow label="Phone" value={selected.parent.phoneNumber} />
+                  <DetailRow label="Phone" value={selected.parent.phoneNumber || "Not provided"} />
                 </div>
               </>
             )}
@@ -266,7 +266,7 @@ export default function ParentRequestsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.assignedTeacher.name} icon={User} />
                   <DetailRow label="Email" value={selected.assignedTeacher.email} />
-                  <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber} />
+                  <DetailRow label="Phone" value={selected.assignedTeacher.phoneNumber || selected.teacherProfile?.phone || "Not provided"} />
                 </div>
               </>
             )}
@@ -275,7 +275,7 @@ export default function ParentRequestsPage() {
                 <SectionHeader title="Teacher Profile" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.teacherProfile.name} />
-                  <DetailRow label="Phone" value={selected.teacherProfile.phone} />
+                  <DetailRow label="Phone" value={selected.teacherProfile.phone || "Not provided"} />
                   <DetailRow label="Address" value={selected.teacherProfile.address} />
                   <DetailRow label="Gender" value={selected.teacherProfile.gender} />
                   <DetailRow label="Qualification" value={selected.teacherProfile.academicQualification} />

@@ -130,7 +130,7 @@ function TeacherProfileSection({ name, email, phoneNumber, profile, onZoom }: { 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <DetailRow label="Name" value={name} icon={User} />
         <DetailRow label="Email" value={email} icon={Mail} />
-        <DetailRow label="Phone" value={phoneNumber || profile?.phone} icon={Phone} />
+        <DetailRow label="Phone" value={phoneNumber || profile?.phone || "Not provided"} icon={Phone} />
         <DetailRow label="Gender" value={profile?.gender} />
         <DetailRow label="Qualification" value={profile?.academicQualification} />
         <DetailRow label="Experience" value={profile?.experience} />
@@ -284,7 +284,7 @@ export default function RefundsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selected.parent.name} icon={User} />
                   <DetailRow label="Email" value={selected.parent.email} icon={Mail} />
-                  <DetailRow label="Phone" value={selected.parent.phoneNumber} icon={Phone} />
+                  <DetailRow label="Phone" value={selected.parent.phoneNumber || "Not provided"} icon={Phone} />
                 </div>
               </>
             )}
@@ -360,7 +360,7 @@ export default function RefundsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow label="Name" value={selectedLog.details.parent.name} icon={User} />
                   <DetailRow label="Email" value={selectedLog.details.parent.email} icon={Mail} />
-                  <DetailRow label="Phone" value={selectedLog.details.parent.phoneNumber} icon={Phone} />
+                  <DetailRow label="Phone" value={selectedLog.details.parent.phoneNumber || "Not provided"} icon={Phone} />
                 </div>
               </>
             )}
