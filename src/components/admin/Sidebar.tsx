@@ -18,6 +18,7 @@ import {
   ChevronRight,
   LogOut,
   ShieldCheck,
+  RotateCcw,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/admin/teachers", label: "Teachers", icon: GraduationCap },
   { href: "/admin/teacher-requests", label: "Teacher Requests", icon: ClipboardCheck },
   { href: "/admin/parent-requests", label: "Parent Requests", icon: ClipboardList },
+  { href: "/admin/refunds", label: "Refunds", icon: RotateCcw },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/notifications", label: "Send Notification", icon: Bell },
