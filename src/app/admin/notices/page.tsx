@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaphone } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaphone, Clock, Users } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
@@ -19,6 +19,8 @@ export default function NoticesPage() {
   const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
   const [showAsPopup, setShowAsPopup] = useState(false);
+  const [popupExpiresAt, setPopupExpiresAt] = useState("");
+  const [targetRole, setTargetRole] = useState<"teacher" | "parent" | "both">("both");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -50,6 +52,8 @@ export default function NoticesPage() {
     setSubtitle("");
     setDescription("");
     setShowAsPopup(false);
+    setPopupExpiresAt("");
+    setTargetRole("both");
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages([]);
@@ -62,6 +66,8 @@ export default function NoticesPage() {
     setSubtitle(n.subtitle || "");
     setDescription(n.description || "");
     setShowAsPopup(n.showAsPopup || false);
+    setPopupExpiresAt(n.popupExpiresAt ? new Date(n.popupExpiresAt).toISOString().slice(0, 16) : "");
+    setTargetRole(n.targetRole || "both");
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages(n.images || []);
@@ -104,11 +110,16 @@ export default function NoticesPage() {
         setUploading(false);
       }
 
+      const payload = {
+        title, subtitle, description, images: allImages, showAsPopup,
+        popupExpiresAt: showAsPopup && popupExpiresAt ? new Date(popupExpiresAt).toISOString() : null,
+        targetRole,
+      };
       if (editId) {
-        await noticeService.update(editId, { title, subtitle, description, images: allImages, showAsPopup });
+        await noticeService.update(editId, payload);
         toast.success("Notice updated successfully");
       } else {
-        await noticeService.create({ title, subtitle, description, images: allImages, showAsPopup });
+        await noticeService.create(payload);
         toast.success("Notice created successfully");
       }
       setModalOpen(false);
@@ -119,7 +130,7 @@ export default function NoticesPage() {
     } finally {
       setSaving(false);
     }
-  }, [title, subtitle, description, showAsPopup, existingImages, imageFiles, editId, fetch, toast]);
+  }, [title, subtitle, description, showAsPopup, popupExpiresAt, targetRole, existingImages, imageFiles, editId, fetch, toast]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -211,6 +222,39 @@ export default function NoticesPage() {
               </div>
             </div>
           </label>
+
+          {showAsPopup && (
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50">
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
+                  <Users size={13} className="text-slate-400" />
+                  Show To
+                </label>
+                <select
+                  value={targetRole}
+                  onChange={(e) => setTargetRole(e.target.value as "teacher" | "parent" | "both")}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="both">Both (Teachers & Parents)</option>
+                  <option value="teacher">Teachers Only</option>
+                  <option value="parent">Parents Only</option>
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
+                  <Clock size={13} className="text-slate-400" />
+                  Popup Expires At
+                </label>
+                <input
+                  type="datetime-local"
+                  value={popupExpiresAt}
+                  onChange={(e) => setPopupExpiresAt(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Leave empty to show indefinitely</p>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Images</label>
@@ -311,15 +355,28 @@ export default function NoticesPage() {
                 )}
               </div>
             )},
-            { key: "showAsPopup", header: "Popup", render: (n) => (
-              n.showAsPopup ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                  <Megaphone size={11} /> On
-                </span>
+            { key: "showAsPopup", header: "Popup", render: (n) => {
+              const expired = n.showAsPopup && n.popupExpiresAt && new Date(n.popupExpiresAt) < new Date();
+              return n.showAsPopup ? (
+                <div className="flex flex-col gap-0.5">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${expired ? "bg-slate-100 text-slate-400 line-through" : "bg-blue-100 text-blue-700"}`}>
+                    <Megaphone size={11} /> {expired ? "Expired" : "On"}
+                  </span>
+                  {n.targetRole && (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                      <Users size={10} /> {n.targetRole}
+                    </span>
+                  )}
+                  {n.popupExpiresAt && (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                      <Clock size={10} /> {new Date(n.popupExpiresAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
               ) : (
                 <span className="text-slate-300 text-xs">Off</span>
-              )
-            )},
+              );
+            }},
             { key: "actions", header: "", render: (n) => (
               <div className="flex gap-1.5 justify-end">
                 <ActionButton icon={Pencil} label="Edit" onClick={() => openEdit(n)} color="blue" />

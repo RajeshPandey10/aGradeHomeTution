@@ -8,6 +8,8 @@ export interface Notice {
   description?: string;
   images?: string[];
   showAsPopup?: boolean;
+  popupExpiresAt?: string | null;
+  targetRole?: "teacher" | "parent" | "both";
   createdAt?: string;
 }
 
@@ -18,10 +20,10 @@ export const noticeService = {
   getById: (id: string) =>
     handleRequest<Notice>(() => api.get(`/api/public/notices/${id}`)),
 
-  create: (data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean }) =>
+  create: (data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean; popupExpiresAt?: string | null; targetRole?: string }) =>
     handleRequest<Notice>(() => api.post("/api/admin/notices", data)),
 
-  update: (id: string, data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean }) =>
+  update: (id: string, data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean; popupExpiresAt?: string | null; targetRole?: string }) =>
     handleRequest<Notice>(() => api.put(`/api/admin/notices/${id}`, data)),
 
   delete: (id: string) =>
