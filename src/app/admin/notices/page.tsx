@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaph
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
+import { getImageUrl } from "@/lib/image";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, EmptyState, Loading, ActionButtonSolid } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
@@ -261,7 +262,7 @@ export default function NoticesPage() {
             <div className="flex flex-wrap gap-3">
               {existingImages.map((url) => (
                 <div key={url} className="relative group">
-                  <img src={url} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                  <img src={getImageUrl(url)} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
                   <button
                     type="button"
                     onClick={() => removeExistingImage(url)}
@@ -332,7 +333,7 @@ export default function NoticesPage() {
             { key: "title", header: "Title", render: (n) => (
               <div className="flex items-center gap-3">
                 {n.images && n.images.length > 0 && (
-                  <img src={n.images[0]} alt="" className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
+                  <img src={getImageUrl(n.images[0])} alt="" className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
                 )}
                 <span className="font-medium text-slate-900">{n.title}</span>
               </div>

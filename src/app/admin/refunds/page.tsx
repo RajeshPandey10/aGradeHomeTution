@@ -25,6 +25,7 @@ import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, ActionButtonSolid, Loading, EmptyState } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ImageLightbox, useLightbox } from "@/components/admin/ImageLightbox";
+import { getImageUrl } from "@/lib/image";
 import api from "@/lib/axios";
 
 interface TeacherProfileSnapshot {
@@ -77,10 +78,11 @@ function SectionHeader({ title }: { title: string }) {
 
 function CvLink({ url }: { url?: string | null }) {
   if (!url) return null;
+  const resolved = getImageUrl(url);
   return (
     <div>
       <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">CV</span>
-      <a href={url} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium">
+      <a href={resolved} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium">
         <FileText size={14} />
         View CV
         <ExternalLink size={12} />
@@ -96,8 +98,8 @@ function IdentificationLinks({ urls, onZoom }: { urls?: string[] | null; onZoom:
       <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Identification Documents</span>
       <div className="flex flex-wrap gap-2 mt-1">
         {urls.map((url, i) => (
-          <button key={url} type="button" onClick={() => onZoom(url)} className="block cursor-zoom-in group relative">
-            <img src={url} alt={`ID ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-slate-200 group-hover:border-blue-400 transition-colors" />
+          <button key={url} type="button" onClick={() => onZoom(getImageUrl(url))} className="block cursor-zoom-in group relative">
+            <img src={getImageUrl(url)} alt={`ID ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-slate-200 group-hover:border-blue-400 transition-colors" />
             <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg">
               <ZoomIn size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
             </span>
@@ -110,11 +112,12 @@ function IdentificationLinks({ urls, onZoom }: { urls?: string[] | null; onZoom:
 
 function QrPreview({ url, onZoom }: { url?: string | null; onZoom: (url: string) => void }) {
   if (!url) return null;
+  const resolved = getImageUrl(url);
   return (
     <div>
       <span className="font-medium text-slate-400 text-xs uppercase tracking-wider flex items-center gap-1"><ImageIcon size={12} /> QR Code</span>
-      <button type="button" onClick={() => onZoom(url)} className="mt-1 block cursor-zoom-in group relative w-40 h-40">
-        <img src={url} alt="Refund QR" className="w-40 h-40 object-contain rounded-lg border border-amber-200 group-hover:border-blue-400 transition-colors bg-white" />
+      <button type="button" onClick={() => onZoom(resolved)} className="mt-1 block cursor-zoom-in group relative w-40 h-40">
+        <img src={resolved} alt="Refund QR" className="w-40 h-40 object-contain rounded-lg border border-amber-200 group-hover:border-blue-400 transition-colors bg-white" />
         <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg">
           <ZoomIn size={22} className="text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
         </span>

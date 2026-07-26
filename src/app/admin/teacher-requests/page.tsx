@@ -5,28 +5,21 @@ import { CheckCircle, XCircle, Eye, ExternalLink, FileText, ArrowLeft, Loader2, 
 import { useRealtimeRefresh } from "@/lib/socket";
 import { teacherService, TeacherProfile } from "@/services/teacherService";
 import { useToast } from "@/hooks/useToast";
+import { getImageUrl } from "@/lib/image";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, ActionButtonSolid, Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 
-function getPdfViewUrl(url: string): string {
-  // Cloudinary PDFs uploaded as image type: rewrite to raw/upload for correct content-type
-  return url.replace(
-    /\/image\/upload\/(.*\.pdf(\?.*)?$)/i,
-    "/raw/upload/$1"
-  );
-}
-
 function PdfViewer({ url }: { url: string }) {
   const [failed, setFailed] = useState(false);
-  const viewUrl = getPdfViewUrl(url);
+  const resolvedUrl = getImageUrl(url);
   if (failed) {
     return (
       <div className="flex flex-col items-center justify-center min-h-64 gap-4 bg-slate-50 rounded-lg border border-slate-200 p-6 text-center">
         <FileText size={40} className="text-slate-400" />
         <p className="text-slate-600 text-sm">Could not preview this PDF in the browser.</p>
         <a
-          href={url}
+          href={resolvedUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
@@ -38,8 +31,8 @@ function PdfViewer({ url }: { url: string }) {
   }
   return (
     <iframe
-      key={viewUrl}
-      src={viewUrl}
+      key={resolvedUrl}
+      src={resolvedUrl}
       className="w-full rounded-lg border border-slate-200"
       style={{ minHeight: "75vh" }}
       title="PDF viewer"
@@ -202,7 +195,7 @@ export default function TeacherRequestsPage() {
                 <div>
                   <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">CV</span>
                   <p className="mt-0.5">
-                    <button onClick={() => setViewingDoc(cvUrl)} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
+                    <button onClick={() => setViewingDoc(getImageUrl(cvUrl))} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
                       <FileText size={14} /> View CV <ExternalLink size={12} />
                     </button>
                   </p>
@@ -216,7 +209,7 @@ export default function TeacherRequestsPage() {
                   <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Identification</span>
                   <div className="mt-0.5 space-y-1">
                     {ids.map((url, i) => (
-                      <button key={i} onClick={() => setViewingDoc(url)} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
+                      <button key={i} onClick={() => setViewingDoc(getImageUrl(url))} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
                         <FileText size={14} /> ID {i + 1} <ExternalLink size={12} />
                       </button>
                     ))}
@@ -250,7 +243,7 @@ export default function TeacherRequestsPage() {
               <button onClick={() => setViewingDoc(null)} className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm">
                 <ArrowLeft size={16} /> Back to profile
               </button>
-              <a href={viewingDoc} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+              <a href={getImageUrl(viewingDoc)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
                 <ExternalLink size={14} /> Open in new tab
               </a>
             </div>
