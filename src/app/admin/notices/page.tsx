@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaphone, Clock, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaphone, Clock, Users, Timer } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
@@ -22,6 +22,9 @@ export default function NoticesPage() {
   const [showAsPopup, setShowAsPopup] = useState(false);
   const [popupExpiresAt, setPopupExpiresAt] = useState("");
   const [targetRole, setTargetRole] = useState<"teacher" | "parent" | "both">("both");
+  const [countdownTo, setCountdownTo] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("");
+  const [ctaHref, setCtaHref] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
@@ -55,6 +58,9 @@ export default function NoticesPage() {
     setShowAsPopup(false);
     setPopupExpiresAt("");
     setTargetRole("both");
+    setCountdownTo("");
+    setCtaLabel("");
+    setCtaHref("");
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages([]);
@@ -69,6 +75,9 @@ export default function NoticesPage() {
     setShowAsPopup(n.showAsPopup || false);
     setPopupExpiresAt(n.popupExpiresAt ? new Date(n.popupExpiresAt).toISOString().slice(0, 16) : "");
     setTargetRole(n.targetRole || "both");
+    setCountdownTo(n.countdownTo ? new Date(n.countdownTo).toISOString().slice(0, 16) : "");
+    setCtaLabel(n.ctaLabel || "");
+    setCtaHref(n.ctaHref || "");
     setImageFiles([]);
     setImagePreviews([]);
     setExistingImages(n.images || []);
@@ -115,6 +124,9 @@ export default function NoticesPage() {
         title, subtitle, description, images: allImages, showAsPopup,
         popupExpiresAt: showAsPopup && popupExpiresAt ? new Date(popupExpiresAt).toISOString() : null,
         targetRole,
+        countdownTo: countdownTo ? new Date(countdownTo).toISOString() : null,
+        ctaLabel: ctaLabel || null,
+        ctaHref: ctaHref || null,
       };
       if (editId) {
         await noticeService.update(editId, payload);
@@ -131,7 +143,7 @@ export default function NoticesPage() {
     } finally {
       setSaving(false);
     }
-  }, [title, subtitle, description, showAsPopup, popupExpiresAt, targetRole, existingImages, imageFiles, editId, fetch, toast]);
+  }, [title, subtitle, description, showAsPopup, popupExpiresAt, targetRole, countdownTo, ctaLabel, ctaHref, existingImages, imageFiles, editId, fetch, toast]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -256,6 +268,47 @@ export default function NoticesPage() {
               </div>
             </div>
           )}
+
+          <div className="p-3 rounded-lg border border-amber-100 bg-amber-50 space-y-3">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-slate-900">
+              <Timer size={16} className="text-amber-500" />
+              Website Countdown Banner (optional)
+            </p>
+            <p className="text-xs text-slate-500 -mt-2">
+              Set a target date to render this notice as a live countdown banner on the website homepage. Leave empty to skip.
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">Counts down to</label>
+                <input
+                  type="datetime-local"
+                  value={countdownTo}
+                  onChange={(e) => setCountdownTo(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">Button label</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Enroll Now"
+                  value={ctaLabel}
+                  onChange={(e) => setCtaLabel(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">Button link</label>
+                <input
+                  type="text"
+                  placeholder="/find-a-tutor"
+                  value={ctaHref}
+                  onChange={(e) => setCtaHref(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Images</label>

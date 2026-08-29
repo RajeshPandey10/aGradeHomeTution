@@ -10,8 +10,25 @@ export interface Notice {
   showAsPopup?: boolean;
   popupExpiresAt?: string | null;
   targetRole?: "teacher" | "parent" | "both";
+  // Optional homepage countdown banner (website only)
+  countdownTo?: string | null;
+  ctaLabel?: string | null;
+  ctaHref?: string | null;
   createdAt?: string;
 }
+
+type NoticeInput = {
+  title: string;
+  subtitle?: string;
+  description?: string;
+  images?: string[];
+  showAsPopup?: boolean;
+  popupExpiresAt?: string | null;
+  targetRole?: string;
+  countdownTo?: string | null;
+  ctaLabel?: string | null;
+  ctaHref?: string | null;
+};
 
 export const noticeService = {
   getAll: () =>
@@ -20,10 +37,10 @@ export const noticeService = {
   getById: (id: string) =>
     handleRequest<Notice>(() => api.get(`/api/public/notices/${id}`)),
 
-  create: (data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean; popupExpiresAt?: string | null; targetRole?: string }) =>
+  create: (data: NoticeInput) =>
     handleRequest<Notice>(() => api.post("/api/admin/notices", data)),
 
-  update: (id: string, data: { title: string; subtitle?: string; description?: string; images?: string[]; showAsPopup?: boolean; popupExpiresAt?: string | null; targetRole?: string }) =>
+  update: (id: string, data: NoticeInput) =>
     handleRequest<Notice>(() => api.put(`/api/admin/notices/${id}`, data)),
 
   delete: (id: string) =>

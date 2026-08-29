@@ -19,6 +19,10 @@ import {
   LogOut,
   ShieldCheck,
   RotateCcw,
+  Mail,
+  HelpCircle,
+  UserSquare2,
+  Quote,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
@@ -26,6 +30,10 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/notices", label: "Notices", icon: FileText },
   { href: "/admin/cms", label: "CMS", icon: FileSpreadsheet },
+  { href: "/admin/contact-messages", label: "Contact Messages", icon: Mail },
+  { href: "/admin/faq-items", label: "FAQ", icon: HelpCircle },
+  { href: "/admin/team", label: "Team", icon: UserSquare2 },
+  { href: "/admin/testimonials", label: "Testimonials", icon: Quote },
   { href: "/admin/parents", label: "Parents", icon: Users },
   { href: "/admin/teachers", label: "Teachers", icon: GraduationCap },
   { href: "/admin/teacher-requests", label: "Teacher Requests", icon: ClipboardCheck },
