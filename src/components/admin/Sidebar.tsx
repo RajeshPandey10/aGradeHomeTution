@@ -23,6 +23,7 @@ import {
   HelpCircle,
   UserSquare2,
   Quote,
+  BarChart3,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/admin/faq-items", label: "FAQ", icon: HelpCircle },
   { href: "/admin/team", label: "Team", icon: UserSquare2 },
   { href: "/admin/testimonials", label: "Testimonials", icon: Quote },
+  { href: "/admin/site-stats", label: "Homepage Stats", icon: BarChart3 },
   { href: "/admin/parents", label: "Parents", icon: Users },
   { href: "/admin/teachers", label: "Teachers", icon: GraduationCap },
   { href: "/admin/teacher-requests", label: "Teacher Requests", icon: ClipboardCheck },
