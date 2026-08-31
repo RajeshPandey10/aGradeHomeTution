@@ -623,6 +623,7 @@ export default function RefundsPage() {
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tuition</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Resolution</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Reason</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Approved At</th>
                   <th></th>
@@ -641,6 +642,7 @@ export default function RefundsPage() {
                         {log.details?.resolution === "delete" ? "Deleted" : "Vacant"}
                       </span>
                     </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.originalRefundRequest?.reason || log.details?.originalRefundRequest?.reasons || "—"}</td>
                     <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.adminReason || "—"}</td>
                     <td className="px-5 py-3.5 text-xs text-slate-500">
                       <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(log.createdAt).toLocaleDateString()}</span>
@@ -663,6 +665,7 @@ export default function RefundsPage() {
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tuition</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Teacher</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Listing</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reason</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin Reason</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Rejected At</th>
                   <th></th>
@@ -683,6 +686,7 @@ export default function RefundsPage() {
                         {log.details?.resolution === "delete" ? "Deleted" : log.details?.resolution === "vacant" ? "Vacant" : "Kept As Is"}
                       </span>
                     </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.originalRefundRequest?.reason || log.details?.originalRefundRequest?.reasons || "—"}</td>
                     <td className="px-5 py-3.5 text-sm text-slate-600 max-w-65 whitespace-normal">{log.details?.adminReason || "—"}</td>
                     <td className="px-5 py-3.5 text-xs text-slate-500">
                       <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(log.createdAt).toLocaleString()}</span>
