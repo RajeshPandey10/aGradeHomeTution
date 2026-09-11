@@ -38,13 +38,26 @@ const navItems = [
   { href: "/admin/site-stats", label: "Homepage Stats", icon: BarChart3 },
   { href: "/admin/parents", label: "Parents", icon: Users },
   { href: "/admin/teachers", label: "Teachers", icon: GraduationCap },
-  { href: "/admin/teacher-requests", label: "Teacher Requests", icon: ClipboardCheck },
-  { href: "/admin/parent-requests", label: "Parent Requests", icon: ClipboardList },
+  {
+    href: "/admin/teacher-requests",
+    label: "Teacher Requests",
+    icon: ClipboardCheck,
+  },
+  {
+    href: "/admin/parent-requests",
+    label: "Parent Requests",
+    icon: ClipboardList,
+  },
   { href: "/admin/refunds", label: "Refunds", icon: RotateCcw },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/notifications", label: "Send Notification", icon: Bell },
-  { href: "/admin/notification-logs", label: "Notification Logs", icon: History },
+  {
+    href: "/admin/notification-logs",
+    label: "Notification Logs",
+    icon: History,
+  },
+  { href: "/admin/email-senders", label: "Email Senders", icon: Mail },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck },
 ];
 
@@ -84,7 +97,9 @@ export default function Sidebar() {
               }`}
             >
               <item.icon size={20} className="shrink-0" />
-              {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+              {sidebarOpen && (
+                <span className="text-sm font-medium">{item.label}</span>
+              )}
             </Link>
           );
         })}
