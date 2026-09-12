@@ -1,13 +1,32 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, X, ImageIcon, Upload, Loader2, Eye, Edit3, Megaphone, Clock, Users, Timer } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  ImageIcon,
+  Upload,
+  Loader2,
+  Eye,
+  Edit3,
+  Megaphone,
+  Clock,
+  Users,
+  Timer,
+} from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { noticeService, Notice } from "@/services/noticeService";
 import { useToast } from "@/hooks/useToast";
 import { getImageUrl } from "@/lib/image";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
-import { ActionButton, EmptyState, Loading, ActionButtonSolid } from "@/components/admin/UI";
+import {
+  ActionButton,
+  EmptyState,
+  Loading,
+  ActionButtonSolid,
+} from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
@@ -21,7 +40,9 @@ export default function NoticesPage() {
   const [description, setDescription] = useState("");
   const [showAsPopup, setShowAsPopup] = useState(false);
   const [popupExpiresAt, setPopupExpiresAt] = useState("");
-  const [targetRole, setTargetRole] = useState<"teacher" | "parent" | "both">("both");
+  const [targetRole, setTargetRole] = useState<"teacher" | "parent" | "both">(
+    "both",
+  );
   const [countdownTo, setCountdownTo] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaHref, setCtaHref] = useState("");
@@ -47,7 +68,9 @@ export default function NoticesPage() {
     }
   }, [toast]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
   useRealtimeRefresh(fetch, ["parent-request:updated"]);
 
   const openAdd = useCallback(() => {
@@ -73,9 +96,15 @@ export default function NoticesPage() {
     setSubtitle(n.subtitle || "");
     setDescription(n.description || "");
     setShowAsPopup(n.showAsPopup || false);
-    setPopupExpiresAt(n.popupExpiresAt ? new Date(n.popupExpiresAt).toISOString().slice(0, 16) : "");
+    setPopupExpiresAt(
+      n.popupExpiresAt
+        ? new Date(n.popupExpiresAt).toISOString().slice(0, 16)
+        : "",
+    );
     setTargetRole(n.targetRole || "both");
-    setCountdownTo(n.countdownTo ? new Date(n.countdownTo).toISOString().slice(0, 16) : "");
+    setCountdownTo(
+      n.countdownTo ? new Date(n.countdownTo).toISOString().slice(0, 16) : "",
+    );
     setCtaLabel(n.ctaLabel || "");
     setCtaHref(n.ctaHref || "");
     setImageFiles([]);
@@ -84,19 +113,22 @@ export default function NoticesPage() {
     setModalOpen(true);
   }, []);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setImageFiles((prev) => [...prev, ...files]);
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreviews((prev) => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      setImageFiles((prev) => [...prev, ...files]);
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setImagePreviews((prev) => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [],
+  );
 
   const removeNewImage = useCallback((index: number) => {
     setImageFiles((prev) => prev.filter((_, i) => i !== index));
@@ -107,43 +139,70 @@ export default function NoticesPage() {
     setExistingImages((prev) => prev.filter((u) => u !== url));
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      let allImages = [...existingImages];
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSaving(true);
+      try {
+        let allImages = [...existingImages];
 
-      if (imageFiles.length > 0) {
-        setUploading(true);
-        const uploadRes = await noticeService.uploadImages(imageFiles);
-        allImages = [...allImages, ...uploadRes.data.urls];
+        if (imageFiles.length > 0) {
+          setUploading(true);
+          const uploadRes = await noticeService.uploadImages(imageFiles);
+          allImages = [...allImages, ...uploadRes.data.urls];
+          setUploading(false);
+        }
+
+        const payload = {
+          title,
+          subtitle,
+          description,
+          images: allImages,
+          showAsPopup,
+          popupExpiresAt:
+            showAsPopup && popupExpiresAt
+              ? new Date(popupExpiresAt).toISOString()
+              : null,
+          targetRole,
+          countdownTo: countdownTo ? new Date(countdownTo).toISOString() : null,
+          ctaLabel: ctaLabel || null,
+          ctaHref: ctaHref || null,
+        };
+        if (editId) {
+          await noticeService.update(editId, payload);
+          toast.success("Notice updated successfully");
+        } else {
+          await noticeService.create(payload);
+          toast.success("Notice created successfully");
+        }
+        setModalOpen(false);
+        fetch();
+      } catch {
         setUploading(false);
+        toast.error(
+          editId ? "Failed to update notice" : "Failed to create notice",
+        );
+      } finally {
+        setSaving(false);
       }
-
-      const payload = {
-        title, subtitle, description, images: allImages, showAsPopup,
-        popupExpiresAt: showAsPopup && popupExpiresAt ? new Date(popupExpiresAt).toISOString() : null,
-        targetRole,
-        countdownTo: countdownTo ? new Date(countdownTo).toISOString() : null,
-        ctaLabel: ctaLabel || null,
-        ctaHref: ctaHref || null,
-      };
-      if (editId) {
-        await noticeService.update(editId, payload);
-        toast.success("Notice updated successfully");
-      } else {
-        await noticeService.create(payload);
-        toast.success("Notice created successfully");
-      }
-      setModalOpen(false);
-      fetch();
-    } catch {
-      setUploading(false);
-      toast.error(editId ? "Failed to update notice" : "Failed to create notice");
-    } finally {
-      setSaving(false);
-    }
-  }, [title, subtitle, description, showAsPopup, popupExpiresAt, targetRole, countdownTo, ctaLabel, ctaHref, existingImages, imageFiles, editId, fetch, toast]);
+    },
+    [
+      title,
+      subtitle,
+      description,
+      showAsPopup,
+      popupExpiresAt,
+      targetRole,
+      countdownTo,
+      ctaLabel,
+      ctaHref,
+      existingImages,
+      imageFiles,
+      editId,
+      fetch,
+      toast,
+    ],
+  );
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -164,11 +223,19 @@ export default function NoticesPage() {
 
   return (
     <div>
-      <PageHeader title="Notices" subtitle="Manage platform notices" action={
-        <ActionButtonSolid icon={Plus} label="Add Notice" onClick={openAdd} />
-      } />
+      <PageHeader
+        title="Notices"
+        subtitle="Manage platform notices"
+        action={
+          <ActionButtonSolid icon={Plus} label="Add Notice" onClick={openAdd} />
+        }
+      />
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? "Edit Notice" : "Add Notice"}>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editId ? "Edit Notice" : "Add Notice"}
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             placeholder="Title"
@@ -185,7 +252,9 @@ export default function NoticesPage() {
             className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-slate-900 bg-white"
           />
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Description (HTML supported)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Description (HTML supported)
+            </label>
             <div className="flex gap-2 mb-2">
               <button
                 type="button"
@@ -206,7 +275,7 @@ export default function NoticesPage() {
             </div>
             {descPreview ? (
               <div
-                className="w-full min-h-[120px] px-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm leading-relaxed [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1.5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_strong]:font-semibold"
+                className="w-full min-h-30 px-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm leading-relaxed [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1.5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-2 [&_li]:mb-1 [&_strong]:font-semibold"
                 dangerouslySetInnerHTML={{ __html: description }}
               />
             ) : (
@@ -220,6 +289,27 @@ export default function NoticesPage() {
             )}
           </div>
 
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 mb-1.5">
+              <Users size={15} className="text-slate-400" />
+              Audience
+            </label>
+            <select
+              value={targetRole}
+              onChange={(e) =>
+                setTargetRole(e.target.value as "teacher" | "parent" | "both")
+              }
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="both">All users (Teachers & Parents)</option>
+              <option value="teacher">Teachers only</option>
+              <option value="parent">Parents only</option>
+            </select>
+            <p className="text-xs text-slate-500 mt-1.5">
+              Choose who can see this notice in the application.
+            </p>
+          </div>
+
           <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
             <input
               type="checkbox"
@@ -230,29 +320,19 @@ export default function NoticesPage() {
             <div className="flex items-center gap-2">
               <Megaphone size={16} className="text-slate-400" />
               <div>
-                <p className="text-sm font-medium text-slate-900">Show as Popup</p>
-                <p className="text-xs text-slate-500">When enabled, this notice appears as a popup when the app starts.</p>
+                <p className="text-sm font-medium text-slate-900">
+                  Show as Popup
+                </p>
+                <p className="text-xs text-slate-500">
+                  When enabled, this notice appears as a popup when the app
+                  starts.
+                </p>
               </div>
             </div>
           </label>
 
           {showAsPopup && (
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50">
-              <div>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
-                  <Users size={13} className="text-slate-400" />
-                  Show To
-                </label>
-                <select
-                  value={targetRole}
-                  onChange={(e) => setTargetRole(e.target.value as "teacher" | "parent" | "both")}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="both">Both (Teachers & Parents)</option>
-                  <option value="teacher">Teachers Only</option>
-                  <option value="parent">Parents Only</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-1 gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50">
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1.5">
                   <Clock size={13} className="text-slate-400" />
@@ -264,7 +344,9 @@ export default function NoticesPage() {
                   onChange={(e) => setPopupExpiresAt(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Leave empty to show indefinitely</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Leave empty to show indefinitely
+                </p>
               </div>
             </div>
           )}
@@ -275,11 +357,14 @@ export default function NoticesPage() {
               Website Countdown Banner (optional)
             </p>
             <p className="text-xs text-slate-500 -mt-2">
-              Set a target date to render this notice as a live countdown banner on the website homepage. Leave empty to skip.
+              Set a target date to render this notice as a live countdown banner
+              on the website homepage. Leave empty to skip.
             </p>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Counts down to</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Counts down to
+                </label>
                 <input
                   type="datetime-local"
                   value={countdownTo}
@@ -288,7 +373,9 @@ export default function NoticesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Button label</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Button label
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Enroll Now"
@@ -298,7 +385,9 @@ export default function NoticesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Button link</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Button link
+                </label>
                 <input
                   type="text"
                   placeholder="/find-a-tutor"
@@ -311,11 +400,17 @@ export default function NoticesPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Images</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Images
+            </label>
             <div className="flex flex-wrap gap-3">
               {existingImages.map((url) => (
                 <div key={url} className="relative group">
-                  <img src={getImageUrl(url)} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                  <img
+                    src={getImageUrl(url)}
+                    alt=""
+                    className="w-20 h-20 object-cover rounded-lg border border-slate-200"
+                  />
                   <button
                     type="button"
                     onClick={() => removeExistingImage(url)}
@@ -327,7 +422,11 @@ export default function NoticesPage() {
               ))}
               {imagePreviews.map((preview, i) => (
                 <div key={preview} className="relative group">
-                  <img src={preview} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200" />
+                  <img
+                    src={preview}
+                    alt=""
+                    className="w-20 h-20 object-cover rounded-lg border border-slate-200"
+                  />
                   <button
                     type="button"
                     onClick={() => removeNewImage(i)}
@@ -357,10 +456,23 @@ export default function NoticesPage() {
           </div>
 
           <div className="flex gap-3 justify-end pt-2">
-            <ActionButton icon={X} label="Cancel" onClick={() => setModalOpen(false)} color="slate" />
+            <ActionButton
+              icon={X}
+              label="Cancel"
+              onClick={() => setModalOpen(false)}
+              color="slate"
+            />
             <ActionButtonSolid
               icon={isUploading ? Loader2 : editId ? Pencil : Plus}
-              label={isUploading ? "Uploading..." : saving ? "Saving..." : editId ? "Update" : "Create"}
+              label={
+                isUploading
+                  ? "Uploading..."
+                  : saving
+                    ? "Saving..."
+                    : editId
+                      ? "Update"
+                      : "Create"
+              }
               onClick={handleSubmit as any}
               disabled={saving}
               color="blue"
@@ -380,63 +492,123 @@ export default function NoticesPage() {
         loading={deleting}
       />
 
-      {loading ? <Loading /> : notices.length === 0 ? <EmptyState message="No notices found" /> : (
+      {loading ? (
+        <Loading />
+      ) : notices.length === 0 ? (
+        <EmptyState message="No notices found" />
+      ) : (
         <DataTable
           columns={[
-            { key: "title", header: "Title", render: (n) => (
-              <div className="flex items-center gap-3">
-                {n.images && n.images.length > 0 && (
-                  <img src={getImageUrl(n.images[0])} alt="" className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
-                )}
-                <span className="font-medium text-slate-900">{n.title}</span>
-              </div>
-            )},
-            { key: "subtitle", header: "Subtitle", render: (n) => (
-              <span className="text-slate-500 line-clamp-2">{n.subtitle || "—"}</span>
-            )},
-            { key: "description", header: "Description", render: (n) => (
-              <div className="text-slate-500 line-clamp-2 text-sm [&_p]:inline [&_p]:mr-1" dangerouslySetInnerHTML={{ __html: n.description || "—" }} />
-            )},
-            { key: "images", header: "Images", render: (n) => (
-              <div className="flex gap-1">
-                {(n.images || []).length > 0 ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-                    <ImageIcon size={14} />
-                    {n.images!.length}
-                  </span>
-                ) : (
-                  <span className="text-slate-300">—</span>
-                )}
-              </div>
-            )},
-            { key: "showAsPopup", header: "Popup", render: (n) => {
-              const expired = n.showAsPopup && n.popupExpiresAt && new Date(n.popupExpiresAt) < new Date();
-              return n.showAsPopup ? (
-                <div className="flex flex-col gap-0.5">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${expired ? "bg-slate-100 text-slate-400 line-through" : "bg-blue-100 text-blue-700"}`}>
-                    <Megaphone size={11} /> {expired ? "Expired" : "On"}
-                  </span>
-                  {n.targetRole && (
-                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                      <Users size={10} /> {n.targetRole}
-                    </span>
+            {
+              key: "title",
+              header: "Title",
+              render: (n) => (
+                <div className="flex items-center gap-3">
+                  {n.images && n.images.length > 0 && (
+                    <img
+                      src={getImageUrl(n.images[0])}
+                      alt=""
+                      className="w-10 h-10 object-cover rounded-lg shrink-0"
+                    />
                   )}
-                  {n.popupExpiresAt && (
-                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                      <Clock size={10} /> {new Date(n.popupExpiresAt).toLocaleDateString()}
+                  <span className="font-medium text-slate-900">{n.title}</span>
+                </div>
+              ),
+            },
+            {
+              key: "subtitle",
+              header: "Subtitle",
+              render: (n) => (
+                <span className="text-slate-500 line-clamp-2">
+                  {n.subtitle || "—"}
+                </span>
+              ),
+            },
+            {
+              key: "description",
+              header: "Description",
+              render: (n) => (
+                <div
+                  className="text-slate-500 line-clamp-2 text-sm [&_p]:inline [&_p]:mr-1"
+                  dangerouslySetInnerHTML={{ __html: n.description || "—" }}
+                />
+              ),
+            },
+            {
+              key: "images",
+              header: "Images",
+              render: (n) => (
+                <div className="flex gap-1">
+                  {(n.images || []).length > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                      <ImageIcon size={14} />
+                      {n.images!.length}
                     </span>
+                  ) : (
+                    <span className="text-slate-300">—</span>
                   )}
                 </div>
-              ) : (
-                <span className="text-slate-300 text-xs">Off</span>
-              );
-            }},
-            { key: "actions", header: "", render: (n) => (
-              <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Pencil} label="Edit" onClick={() => openEdit(n)} color="blue" />
-                <ActionButton icon={Trash2} label="Delete" onClick={() => setDeleteTarget(n)} color="red" />
-              </div>
-            )},
+              ),
+            },
+            {
+              key: "targetRole",
+              header: "Audience",
+              render: (n) => (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 capitalize whitespace-nowrap">
+                  <Users size={11} />{" "}
+                  {n.targetRole === "both"
+                    ? "All users"
+                    : `${n.targetRole}s only`}
+                </span>
+              ),
+            },
+            {
+              key: "showAsPopup",
+              header: "Popup",
+              render: (n) => {
+                const expired =
+                  n.showAsPopup &&
+                  n.popupExpiresAt &&
+                  new Date(n.popupExpiresAt) < new Date();
+                return n.showAsPopup ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${expired ? "bg-slate-100 text-slate-400 line-through" : "bg-blue-100 text-blue-700"}`}
+                    >
+                      <Megaphone size={11} /> {expired ? "Expired" : "On"}
+                    </span>
+                    {n.popupExpiresAt && (
+                      <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                        <Clock size={10} />{" "}
+                        {new Date(n.popupExpiresAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-slate-300 text-xs">Off</span>
+                );
+              },
+            },
+            {
+              key: "actions",
+              header: "",
+              render: (n) => (
+                <div className="flex gap-1.5 justify-end">
+                  <ActionButton
+                    icon={Pencil}
+                    label="Edit"
+                    onClick={() => openEdit(n)}
+                    color="blue"
+                  />
+                  <ActionButton
+                    icon={Trash2}
+                    label="Delete"
+                    onClick={() => setDeleteTarget(n)}
+                    color="red"
+                  />
+                </div>
+              ),
+            },
           ]}
           data={notices}
         />
