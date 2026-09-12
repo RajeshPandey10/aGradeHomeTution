@@ -5,11 +5,26 @@ import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { faqService, FaqItem } from "@/services/faqService";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
-import { ActionButton, Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
+import {
+  ActionButton,
+  Loading,
+  EmptyState,
+  StatusBadge,
+} from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
-type FormData = { question: string; answer: string; order: string; isPublished: boolean };
-const emptyForm: FormData = { question: "", answer: "", order: "0", isPublished: true };
+type FormData = {
+  question: string;
+  answer: string;
+  order: string;
+  isPublished: boolean;
+};
+const emptyForm: FormData = {
+  question: "",
+  answer: "",
+  order: "0",
+  isPublished: true,
+};
 
 export default function FaqItemsPage() {
   const [items, setItems] = useState<FaqItem[]>([]);
@@ -33,7 +48,9 @@ export default function FaqItemsPage() {
     }
   }, [toast]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const openCreate = () => {
     setEditing(null);
@@ -43,7 +60,12 @@ export default function FaqItemsPage() {
 
   const openEdit = (item: FaqItem) => {
     setEditing(item);
-    setForm({ question: item.question, answer: item.answer, order: String(item.order), isPublished: item.isPublished });
+    setForm({
+      question: item.question,
+      answer: item.answer,
+      order: String(item.order),
+      isPublished: item.isPublished,
+    });
     setShowForm(true);
   };
 
@@ -72,7 +94,9 @@ export default function FaqItemsPage() {
       setEditing(null);
       fetchData();
     } catch {
-      toast.error(editing ? "Failed to update FAQ item" : "Failed to create FAQ item");
+      toast.error(
+        editing ? "Failed to update FAQ item" : "Failed to create FAQ item",
+      );
     } finally {
       setSaving(false);
     }
@@ -119,25 +143,45 @@ export default function FaqItemsPage() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/40" onClick={() => { if (!saving) setShowForm(false); }} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setShowForm(false)} disabled={saving} className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer disabled:opacity-40">
+          <div
+            className="fixed inset-0 bg-black/40"
+            onClick={() => {
+              if (!saving) setShowForm(false);
+            }}
+          />
+          <div
+            className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowForm(false)}
+              disabled={saving}
+              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer disabled:opacity-40"
+            >
               <X size={18} />
             </button>
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">{editing ? "Edit FAQ Item" : "Add FAQ Item"}</h2>
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">
+              {editing ? "Edit FAQ Item" : "Add FAQ Item"}
+            </h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Question <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Question <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={form.question}
-                  onChange={(e) => setForm({ ...form, question: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, question: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={saving}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Answer <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Answer <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   value={form.answer}
                   onChange={(e) => setForm({ ...form, answer: e.target.value })}
@@ -148,11 +192,15 @@ export default function FaqItemsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3 items-end">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Order</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Order
+                  </label>
                   <input
                     type="number"
                     value={form.order}
-                    onChange={(e) => setForm({ ...form, order: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, order: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={saving}
                   />
@@ -161,7 +209,9 @@ export default function FaqItemsPage() {
                   <input
                     type="checkbox"
                     checked={form.isPublished}
-                    onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, isPublished: e.target.checked })
+                    }
                     disabled={saving}
                     className="h-4 w-4 rounded border-slate-300"
                   />
@@ -171,7 +221,11 @@ export default function FaqItemsPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => { setShowForm(false); setForm(emptyForm); setEditing(null); }}
+                onClick={() => {
+                  setShowForm(false);
+                  setForm(emptyForm);
+                  setEditing(null);
+                }}
                 disabled={saving}
                 className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer"
               >
@@ -179,7 +233,9 @@ export default function FaqItemsPage() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !form.question.trim() || !form.answer.trim()}
+                disabled={
+                  saving || !form.question.trim() || !form.answer.trim()
+                }
                 className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-40 cursor-pointer inline-flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 size={16} className="animate-spin" />}
@@ -201,23 +257,68 @@ export default function FaqItemsPage() {
         loading={deleting}
       />
 
-      {loading ? <Loading /> : items.length === 0 ? <EmptyState message="No FAQ items yet" /> : (
+      {loading ? (
+        <Loading />
+      ) : items.length === 0 ? (
+        <EmptyState message="No FAQ items yet" />
+      ) : (
         <DataTable
           columns={[
-            { key: "order", header: "#", render: (i) => <span className="text-slate-400">{i.order}</span> },
-            { key: "question", header: "Question", render: (i) => <span className="font-medium text-slate-900">{i.question}</span> },
-            { key: "answer", header: "Answer", render: (i) => <span className="text-slate-500 line-clamp-1 max-w-sm block">{i.answer}</span> },
-            { key: "status", header: "Status", render: (i) => (
-              <button onClick={() => togglePublished(i)} className="cursor-pointer">
-                <StatusBadge status={i.isPublished ? "verified" : "unverified"} />
-              </button>
-            )},
-            { key: "actions", header: "", render: (i) => (
-              <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Pencil} label="Edit" onClick={() => openEdit(i)} color="blue" />
-                <ActionButton icon={Trash2} label="Delete" onClick={() => setDeleteTarget(i)} color="red" />
-              </div>
-            )},
+            {
+              key: "order",
+              header: "#",
+              render: (i) => <span className="text-slate-400">{i.order}</span>,
+            },
+            {
+              key: "question",
+              header: "Question",
+              render: (i) => (
+                <span className="font-medium text-slate-900">{i.question}</span>
+              ),
+            },
+            {
+              key: "answer",
+              header: "Answer",
+              render: (i) => (
+                <span className="text-slate-500 line-clamp-1 max-w-sm block">
+                  {i.answer}
+                </span>
+              ),
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (i) => (
+                <button
+                  onClick={() => togglePublished(i)}
+                  className="cursor-pointer"
+                >
+                  <StatusBadge
+                    status={i.isPublished ? "verified" : "unverified"}
+                  />
+                </button>
+              ),
+            },
+            {
+              key: "actions",
+              header: "",
+              render: (i) => (
+                <div className="flex gap-1.5 justify-end">
+                  <ActionButton
+                    icon={Pencil}
+                    label="Edit"
+                    onClick={() => openEdit(i)}
+                    color="blue"
+                  />
+                  <ActionButton
+                    icon={Trash2}
+                    label="Delete"
+                    onClick={() => setDeleteTarget(i)}
+                    color="red"
+                  />
+                </div>
+              ),
+            },
           ]}
           data={items}
         />

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -26,6 +27,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -64,6 +66,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen, logout } = useAuthStore();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   return (
     <>
@@ -127,7 +130,7 @@ export default function Sidebar() {
 
         <div className="shrink-0 border-t border-slate-700 p-2">
           <button
-            onClick={logout}
+            onClick={() => setLogoutOpen(true)}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
           >
             <LogOut size={20} className="shrink-0" />
@@ -135,6 +138,15 @@ export default function Sidebar() {
           </button>
         </div>
       </aside>
+      <ConfirmDialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={() => logout()}
+        title="Logout"
+        message="Are you sure you want to logout from the admin panel?"
+        confirmLabel="Logout"
+        confirmColor="red"
+      />
     </>
   );
 }

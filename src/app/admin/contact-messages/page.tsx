@@ -5,7 +5,12 @@ import { Reply, Trash2, Loader2, Mail, Phone } from "lucide-react";
 import { contactService, ContactMessage } from "@/services/contactService";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
-import { ActionButton, Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
+import {
+  ActionButton,
+  Loading,
+  EmptyState,
+  StatusBadge,
+} from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Modal } from "@/components/admin/Modal";
 
@@ -39,7 +44,9 @@ export default function ContactMessagesPage() {
     }
   }, [statusFilter, toast]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const openMessage = async (message: ContactMessage) => {
     setActive(message);
@@ -87,7 +94,10 @@ export default function ContactMessagesPage() {
 
   return (
     <div>
-      <PageHeader title="Contact Messages" subtitle="Messages submitted from the website contact form" />
+      <PageHeader
+        title="Contact Messages"
+        subtitle="Messages submitted from the website contact form"
+      />
 
       <div className="mb-5 flex gap-2 flex-wrap">
         {STATUS_TABS.map((tab) => (
@@ -116,7 +126,11 @@ export default function ContactMessagesPage() {
         loading={deleting}
       />
 
-      <Modal open={!!active} onClose={() => setActive(null)} title="Contact Message">
+      <Modal
+        open={!!active}
+        onClose={() => setActive(null)}
+        title="Contact Message"
+      >
         {active && (
           <div className="space-y-4">
             <div className="flex items-start justify-between">
@@ -181,7 +195,11 @@ export default function ContactMessagesPage() {
                 disabled={sending || !replyText.trim()}
                 className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-40 cursor-pointer inline-flex items-center justify-center gap-2"
               >
-                {sending ? <Loader2 size={16} className="animate-spin" /> : <Reply size={16} />}
+                {sending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Reply size={16} />
+                )}
                 {sending ? "Sending..." : "Send Reply"}
               </button>
             </div>
@@ -189,29 +207,73 @@ export default function ContactMessagesPage() {
         )}
       </Modal>
 
-      {loading ? <Loading /> : messages.length === 0 ? <EmptyState message="No contact messages yet" /> : (
+      {loading ? (
+        <Loading />
+      ) : messages.length === 0 ? (
+        <EmptyState message="No contact messages yet" />
+      ) : (
         <DataTable
           columns={[
-            { key: "name", header: "From", render: (m) => (
-              <div>
-                <p className="font-medium text-slate-900">{m.name}</p>
-                <p className="text-xs text-slate-500">{m.email}</p>
-              </div>
-            )},
-            { key: "subject", header: "Subject", render: (m) => <span className="text-slate-600">{m.subject}</span> },
-            { key: "message", header: "Message", render: (m) => (
-              <span className="text-slate-500 line-clamp-1 max-w-xs block">{m.message}</span>
-            )},
-            { key: "date", header: "Received", render: (m) => (
-              <span className="text-slate-500">{new Date(m.createdAt).toLocaleDateString()}</span>
-            )},
-            { key: "status", header: "Status", render: (m) => <StatusBadge status={m.status} /> },
-            { key: "actions", header: "", render: (m) => (
-              <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Reply} label="View / Reply" onClick={() => openMessage(m)} color="blue" />
-                <ActionButton icon={Trash2} label="Delete" onClick={() => setDeleteTarget(m)} color="red" />
-              </div>
-            )},
+            {
+              key: "name",
+              header: "From",
+              render: (m) => (
+                <div>
+                  <p className="font-medium text-slate-900">{m.name}</p>
+                  <p className="text-xs text-slate-500">{m.email}</p>
+                </div>
+              ),
+            },
+            {
+              key: "subject",
+              header: "Subject",
+              render: (m) => (
+                <span className="text-slate-600">{m.subject}</span>
+              ),
+            },
+            {
+              key: "message",
+              header: "Message",
+              render: (m) => (
+                <span className="text-slate-500 line-clamp-1 max-w-xs block">
+                  {m.message}
+                </span>
+              ),
+            },
+            {
+              key: "date",
+              header: "Received",
+              render: (m) => (
+                <span className="text-slate-500">
+                  {new Date(m.createdAt).toLocaleDateString()}
+                </span>
+              ),
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (m) => <StatusBadge status={m.status} />,
+            },
+            {
+              key: "actions",
+              header: "",
+              render: (m) => (
+                <div className="flex gap-1.5 justify-end">
+                  <ActionButton
+                    icon={Reply}
+                    label="View / Reply"
+                    onClick={() => openMessage(m)}
+                    color="blue"
+                  />
+                  <ActionButton
+                    icon={Trash2}
+                    label="Delete"
+                    onClick={() => setDeleteTarget(m)}
+                    color="red"
+                  />
+                </div>
+              ),
+            },
           ]}
           data={messages}
         />
