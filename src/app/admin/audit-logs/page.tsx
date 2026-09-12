@@ -14,6 +14,7 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { Loading, EmptyState } from "@/components/admin/UI";
+import { Modal } from "@/components/admin/Modal";
 import api from "@/lib/axios";
 
 interface AuditLog {
@@ -25,28 +26,74 @@ interface AuditLog {
     email: string;
     role: string;
   } | null;
+  performedBySnapshot?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+  } | null;
   role: string;
   targetType?: string;
   targetId?: string;
   details?: Record<string, unknown>;
+  reason?: string | null;
   ip?: string;
   createdAt: string;
 }
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  teacher_approved: { label: "Teacher Approved", color: "bg-emerald-100 text-emerald-700" },
-  teacher_rejected: { label: "Teacher Rejected", color: "bg-red-100 text-red-700" },
-  teacher_status_changed: { label: "Teacher Status Changed", color: "bg-amber-100 text-amber-700" },
-  teacher_deleted: { label: "Teacher Deleted", color: "bg-red-100 text-red-700" },
-  request_approved: { label: "Request Approved", color: "bg-emerald-100 text-emerald-700" },
-  request_fulfilled_by_admin: { label: "Request Fulfilled", color: "bg-blue-100 text-blue-700" },
-  request_deleted: { label: "Request Deleted", color: "bg-red-100 text-red-700" },
-  refund_requested: { label: "Refund Requested", color: "bg-orange-100 text-orange-700" },
-  refund_approved: { label: "Refund Approved", color: "bg-emerald-100 text-emerald-700" },
-  refund_executed: { label: "Refund Executed", color: "bg-purple-100 text-purple-700" },
-  payment_manual_submitted: { label: "Manual Payment", color: "bg-blue-100 text-blue-700" },
-  payment_esewa_verified: { label: "eSewa Payment", color: "bg-green-100 text-green-700" },
-  account_deleted: { label: "Account Deleted", color: "bg-red-100 text-red-700" },
+  teacher_approved: {
+    label: "Teacher Approved",
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  teacher_rejected: {
+    label: "Teacher Rejected",
+    color: "bg-red-100 text-red-700",
+  },
+  teacher_status_changed: {
+    label: "Teacher Status Changed",
+    color: "bg-amber-100 text-amber-700",
+  },
+  teacher_deleted: {
+    label: "Teacher Deleted",
+    color: "bg-red-100 text-red-700",
+  },
+  request_approved: {
+    label: "Request Approved",
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  request_fulfilled_by_admin: {
+    label: "Request Fulfilled",
+    color: "bg-blue-100 text-blue-700",
+  },
+  request_deleted: {
+    label: "Request Deleted",
+    color: "bg-red-100 text-red-700",
+  },
+  refund_requested: {
+    label: "Refund Requested",
+    color: "bg-orange-100 text-orange-700",
+  },
+  refund_approved: {
+    label: "Refund Approved",
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  refund_executed: {
+    label: "Refund Executed",
+    color: "bg-purple-100 text-purple-700",
+  },
+  payment_manual_submitted: {
+    label: "Manual Payment",
+    color: "bg-blue-100 text-blue-700",
+  },
+  payment_esewa_verified: {
+    label: "eSewa Payment",
+    color: "bg-green-100 text-green-700",
+  },
+  account_deleted: {
+    label: "Account Deleted",
+    color: "bg-red-100 text-red-700",
+  },
 };
 
 const ACTION_OPTIONS = [
@@ -80,7 +127,7 @@ export default function AuditLogsPage() {
   const [total, setTotal] = useState(0);
   const [actionFilter, setActionFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const toast = useToast();
 
   const fetchLogs = useCallback(async () => {
@@ -136,10 +183,7 @@ export default function AuditLogsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Audit Logs"
-        subtitle={`${total} total log entries`}
-      />
+      <PageHeader title="Audit Logs" subtitle={`${total} total log entries`} />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
@@ -255,11 +299,11 @@ export default function AuditLogsPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExpanded(expanded === log._id ? null : log._id);
+                        setSelectedLog(log);
                       }}
                       className="text-xs text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
                     >
-                      {expanded === log._id ? "Hide" : "Details"}
+                      Details
                     </button>
                   ) : null,
               },
@@ -267,33 +311,71 @@ export default function AuditLogsPage() {
             data={logs}
           />
 
-          {/* Expanded details row */}
-          {expanded &&
-            (() => {
-              const log = logs.find((l) => l._id === expanded);
-              if (!log?.details) return null;
-              return (
-                <div className="mt-2 mb-4 mx-1 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                    Details
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {Object.entries(log.details).map(([key, value]) => (
-                      <div key={key} className="text-sm">
-                        <span className="text-slate-400 capitalize">
-                          {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}:
-                        </span>{" "}
-                        <span className="text-slate-700 font-medium">
-                          {typeof value === "object"
-                            ? JSON.stringify(value)
-                            : String(value ?? "—")}
-                        </span>
-                      </div>
-                    ))}
+          <Modal
+            open={!!selectedLog}
+            onClose={() => setSelectedLog(null)}
+            title="Audit Log Details"
+            wide
+          >
+            {selectedLog && (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Action
+                    </p>
+                    <div className="mt-1">
+                      {getActionBadge(selectedLog.action)}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Performed by
+                    </p>
+                    <p className="mt-1 font-medium text-slate-900">
+                      {selectedLog.performedBy?.name ||
+                        selectedLog.performedBySnapshot?.name ||
+                        "Deleted user"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {selectedLog.performedBy?.email ||
+                        selectedLog.performedBySnapshot?.email ||
+                        "No longer available"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Target
+                    </p>
+                    <p className="mt-1 capitalize text-slate-900">
+                      {selectedLog.targetType?.replace(/_/g, " ") || "—"}
+                    </p>
+                    <p className="text-xs text-slate-500 break-all">
+                      {selectedLog.targetId || "—"}
+                    </p>
                   </div>
                 </div>
-              );
-            })()}
+                {selectedLog.reason && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                      Reason
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-slate-700">
+                      {selectedLog.reason}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                    Recorded data
+                  </p>
+                  <pre className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700 whitespace-pre-wrap wrap-break-word">
+                    {JSON.stringify(selectedLog.details || {}, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </Modal>
 
           {/* Pagination */}
           <div className="flex items-center justify-between mt-5">
