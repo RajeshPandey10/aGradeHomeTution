@@ -7,10 +7,11 @@ export default function Navbar() {
   const { user, setSidebarOpen } = useAuthStore();
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10">
+    <header className="relative z-20 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
       <button
         onClick={() => setSidebarOpen(true)}
-        className="p-2 rounded-lg hover:bg-slate-100 transition-colors lg:hidden cursor-pointer"
+        aria-label="Open navigation"
+        className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-slate-100 lg:hidden"
       >
         <Menu size={20} />
       </button>

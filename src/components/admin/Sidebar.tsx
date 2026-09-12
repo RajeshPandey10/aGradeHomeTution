@@ -66,54 +66,75 @@ export default function Sidebar() {
   const { sidebarOpen, setSidebarOpen, logout } = useAuthStore();
 
   return (
-    <aside
-      className={`bg-slate-900 text-white flex flex-col transition-all duration-300 ${
-        sidebarOpen ? "w-64" : "w-16"
-      }`}
-    >
-      <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700">
-        {sidebarOpen && (
-          <span className="font-bold text-lg tracking-wide">aGrade Admin</span>
-        )}
+    <>
+      {sidebarOpen && (
         <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer"
-        >
-          {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-        </button>
-      </div>
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex h-full min-h-0 w-64 flex-col bg-slate-900 text-white shadow-xl transition-transform duration-300 lg:static lg:z-auto lg:shadow-none lg:transition-[width] ${
+          sidebarOpen
+            ? "translate-x-0 lg:w-64"
+            : "-translate-x-full lg:translate-x-0 lg:w-16"
+        }`}
+      >
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-700 px-4">
+          {sidebarOpen && (
+            <span className="font-bold text-lg tracking-wide">
+              aGrade Admin
+            </span>
+          )}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer"
+          >
+            {sidebarOpen ? (
+              <ChevronLeft size={18} />
+            ) : (
+              <ChevronRight size={18} />
+            )}
+          </button>
+        </div>
 
-      <nav className="flex-1 py-4 space-y-1 px-2">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                isActive
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
-              }`}
-            >
-              <item.icon size={20} className="shrink-0" />
-              {sidebarOpen && (
-                <span className="text-sm font-medium">{item.label}</span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-2 py-4">
+          {navItems.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => {
+                  if (window.innerWidth < 1024) setSidebarOpen(false);
+                }}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <item.icon size={20} className="shrink-0" />
+                {sidebarOpen && (
+                  <span className="text-sm font-medium">{item.label}</span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
 
-      <div className="border-t border-slate-700 p-2">
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
-        >
-          <LogOut size={20} className="shrink-0" />
-          {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
-        </button>
-      </div>
-    </aside>
+        <div className="shrink-0 border-t border-slate-700 p-2">
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+          >
+            <LogOut size={20} className="shrink-0" />
+            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
