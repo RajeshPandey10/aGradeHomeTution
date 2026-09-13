@@ -188,15 +188,13 @@ export default function AdminDashboard() {
               sum + (request.payment?.payable || 0),
             0,
           ),
-            (request: any) => dateKey(request.createdAt) === date,
+        };
       });
       setActivityDays(activity);
-            (request: any) => dateKey(request.createdAt) === date,
       setStats([
         {
           label: "Total Parents",
           value: parentsRes.data.data?.length || 0,
-              dateKey(request.paymentSlip?.paidAt || request.createdAt) === date,
           color: "text-blue-600",
           bg: "bg-blue-100",
         },
