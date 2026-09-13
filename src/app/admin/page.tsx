@@ -27,9 +27,13 @@ interface Stat {
 export default function AdminDashboard() {
   const { isAuthenticated, initialize } = useAuthStore();
   const toast = useToast();
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
+  const today = new Date();
+  const [fromDate, setFromDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 6);
+    return date.toISOString().slice(0, 10);
+  });
+  const [toDate, setToDate] = useState(today.toISOString().slice(0, 10));
   const [dailySummary, setDailySummary] = useState({
     parentRequests: 0,
     teacherRequests: 0,
@@ -105,23 +109,26 @@ export default function AdminDashboard() {
         (sum: number, r: any) => sum + (r.payment?.payable || 0),
         0,
       );
-      const dayRequests = parentReqs.filter(
-        (r: any) => (r.createdAt || "").slice(0, 10) === selectedDate,
+      const isInRange = (value: string | undefined) => {
+        const date = (value || "").slice(0, 10);
+        return date >= fromDate && date <= toDate;
+      };
+      const periodRequests = parentReqs.filter((r: any) =>
+        isInRange(r.createdAt),
       );
       const dayTeacherRequests = (teacherReqsRes.data.data || []).filter(
-        (t: any) => (t.createdAt || "").slice(0, 10) === selectedDate,
+        (t: any) => isInRange(t.createdAt),
       );
-      const dayFulfilled = parentReqs.filter(
+      const periodFulfilled = parentReqs.filter(
         (r: any) =>
           r.status === "fulfilled" &&
-          (r.paymentSlip?.paidAt || r.createdAt || "").slice(0, 10) ===
-            selectedDate,
+          isInRange(r.paymentSlip?.paidAt || r.createdAt),
       );
       setDailySummary({
-        parentRequests: dayRequests.length,
+        parentRequests: periodRequests.length,
         teacherRequests: dayTeacherRequests.length,
-        fulfilled: dayFulfilled.length,
-        revenue: dayFulfilled.reduce(
+        fulfilled: periodFulfilled.length,
+        revenue: periodFulfilled.reduce(
           (sum: number, r: any) => sum + (r.payment?.payable || 0),
           0,
         ),
@@ -174,15 +181,15 @@ export default function AdminDashboard() {
     } catch {
       toast.error("Failed to load dashboard stats");
     }
-  }, [selectedDate, toast]);
+  }, [fromDate, toDate, toast]);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
   useEffect(() => {
-    if (isAuthenticated) fetchStats();
-  }, [selectedDate, isAuthenticated, fetchStats]);
+    if (isAuthenticated && fromDate <= toDate) fetchStats();
+  }, [fromDate, toDate, isAuthenticated, fetchStats]);
 
   useRealtimeRefresh(fetchStats, [
     "teacher-profile:status-updated",
@@ -217,6 +224,68 @@ export default function AdminDashboard() {
     <div>
       <PageHeader title="Dashboard" subtitle="Overview of your platform" />
 
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900">Report period</h2>
+            <p className="text-sm text-slate-500">
+              Filter requests and payment activity by date
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const date = new Date();
+              date.setDate(date.getDate() - 6);
+              setFromDate(date.toISOString().slice(0, 10));
+              setToDate(new Date().toISOString().slice(0, 10));
+            }}
+            className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 cursor-pointer"
+          >
+            This week
+          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="dashboard-from"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500"
+            >
+              From
+            </label>
+            <input
+              id="dashboard-from"
+              type="date"
+              value={fromDate}
+              max={toDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="dashboard-to"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500"
+            >
+              To
+            </label>
+            <input
+              id="dashboard-to"
+              type="date"
+              min={fromDate}
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        {fromDate > toDate && (
+          <p className="mt-2 text-sm text-red-600">
+            The From date must be before the To date.
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {stats.map((s) => (
           <StatCard key={s.label} {...s} />
@@ -226,22 +295,10 @@ export default function AdminDashboard() {
       <div className="mt-8">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
           <div>
-            <h2 className="font-semibold text-slate-900">Daily Activity</h2>
+            <h2 className="font-semibold text-slate-900">Period Activity</h2>
             <p className="text-sm text-slate-500">
-              Track requests and payments for a specific date
+              Requests and payments between {fromDate} and {toDate}
             </p>
-          </div>
-          <div>
-            <label htmlFor="dashboard-date" className="sr-only">
-              Activity date
-            </label>
-            <input
-              id="dashboard-date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
