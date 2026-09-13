@@ -62,9 +62,9 @@ export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState(() => {
     const date = new Date();
     date.setDate(date.getDate() - 6);
-    return date.toISOString().slice(0, 10);
+    return formatLocalDate(date);
   });
-  const [toDate, setToDate] = useState(today.toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState(formatLocalDate(today));
   const [dailySummary, setDailySummary] = useState({
     parentRequests: 0,
     teacherRequests: 0,
@@ -136,13 +136,11 @@ export default function AdminDashboard() {
       const parentReqs = parentReqsRes.data.data || [];
       const fulfilledReqs = parentReqs.filter(
         (r: any) => r.status === "fulfilled",
-      return formatLocalDate(date);
       const totalRevenue = fulfilledReqs.reduce(
-    const [toDate, setToDate] = useState(formatLocalDate(today));
         0,
       );
       const isInRange = (value: string | undefined) => {
-        const date = (value || "").slice(0, 10);
+        const date = dateKey(value);
         return date >= fromDate && date <= toDate;
       };
       const periodRequests = parentReqs.filter((r: any) =>
@@ -168,18 +166,15 @@ export default function AdminDashboard() {
 
       const activity = getDateRange(fromDate, toDate).map((date) => {
         const parentRequests = parentReqs.filter(
-          (request: any) => (request.createdAt || "").slice(0, 10) === date,
+          (request: any) => dateKey(request.createdAt) === date,
         ).length;
         const teacherRequests = (teacherReqsRes.data.data || []).filter(
-          (request: any) => (request.createdAt || "").slice(0, 10) === date,
+          (request: any) => dateKey(request.createdAt) === date,
         ).length;
         const payments = parentReqs.filter(
           (request: any) =>
             request.status === "fulfilled" &&
-            (request.paymentSlip?.paidAt || request.createdAt || "").slice(
-              0,
-              10,
-            ) === date,
+            dateKey(request.paymentSlip?.paidAt || request.createdAt) === date,
         );
         return {
           date,
@@ -298,8 +293,8 @@ export default function AdminDashboard() {
             onClick={() => {
               const date = new Date();
               date.setDate(date.getDate() - 6);
-              setFromDate(date.toISOString().slice(0, 10));
-              setToDate(new Date().toISOString().slice(0, 10));
+              setFromDate(formatLocalDate(date));
+              setToDate(formatLocalDate(new Date()));
             }}
             className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 cursor-pointer"
           >
