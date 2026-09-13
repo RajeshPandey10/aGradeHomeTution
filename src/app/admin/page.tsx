@@ -31,13 +31,25 @@ interface ActivityDay {
   payments: number;
   revenue: number;
 }
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const dateKey = (value: string | undefined) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : formatLocalDate(date);
+};
 
 const getDateRange = (from: string, to: string) => {
   const dates: string[] = [];
   const cursor = new Date(`${from}T00:00:00`);
   const end = new Date(`${to}T00:00:00`);
   while (cursor <= end) {
-    dates.push(cursor.toISOString().slice(0, 10));
+    dates.push(formatLocalDate(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
@@ -124,9 +136,9 @@ export default function AdminDashboard() {
       const parentReqs = parentReqsRes.data.data || [];
       const fulfilledReqs = parentReqs.filter(
         (r: any) => r.status === "fulfilled",
-      );
+      return formatLocalDate(date);
       const totalRevenue = fulfilledReqs.reduce(
-        (sum: number, r: any) => sum + (r.payment?.payable || 0),
+    const [toDate, setToDate] = useState(formatLocalDate(today));
         0,
       );
       const isInRange = (value: string | undefined) => {
@@ -179,15 +191,15 @@ export default function AdminDashboard() {
               sum + (request.payment?.payable || 0),
             0,
           ),
-        };
+            (request: any) => dateKey(request.createdAt) === date,
       });
       setActivityDays(activity);
-
+            (request: any) => dateKey(request.createdAt) === date,
       setStats([
         {
           label: "Total Parents",
           value: parentsRes.data.data?.length || 0,
-          icon: Users,
+              dateKey(request.paymentSlip?.paidAt || request.createdAt) === date,
           color: "text-blue-600",
           bg: "bg-blue-100",
         },
