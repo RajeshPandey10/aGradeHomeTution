@@ -136,7 +136,9 @@ export default function AdminDashboard() {
       const parentReqs = parentReqsRes.data.data || [];
       const fulfilledReqs = parentReqs.filter(
         (r: any) => r.status === "fulfilled",
+      );
       const totalRevenue = fulfilledReqs.reduce(
+        (sum: number, r: any) => sum + (r.payment?.payable || 0),
         0,
       );
       const isInRange = (value: string | undefined) => {
