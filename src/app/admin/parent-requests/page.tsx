@@ -917,7 +917,8 @@ export default function ParentRequestsPage() {
               </label>
               <textarea
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
+                rows={4}
+                placeholder="Add any special learning requirements, preferences, or notes"
                 value={editForm.requirements || ""}
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, requirements: e.target.value }))
@@ -976,7 +977,7 @@ export default function ParentRequestsPage() {
                 const short = loc.split(",")[0] || loc;
                 return (
                   <span
-                    className="inline-flex items-center gap-1 text-slate-500 max-w-[180px]"
+                    className="inline-flex items-center gap-1 text-slate-500 max-w-45"
                     title={loc}
                   >
                     <MapPin size={14} className="shrink-0" />
