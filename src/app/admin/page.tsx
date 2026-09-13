@@ -195,6 +195,7 @@ export default function AdminDashboard() {
         {
           label: "Total Parents",
           value: parentsRes.data.data?.length || 0,
+          icon: Users,
           color: "text-blue-600",
           bg: "bg-blue-100",
         },
