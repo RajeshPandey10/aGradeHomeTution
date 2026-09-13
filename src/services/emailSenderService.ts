@@ -13,12 +13,6 @@ export interface EmailSenderStatus {
   lastSuccessfulSend: string | null;
   lastFailure: string | null;
   cooldownUntil: string | null;
-  hourlyLimit: number | null;
-  hourlySent: number;
-  hourlyRemaining: number | null;
-  hourlyWindowStartedAt: string | null;
-  hourlyWindowEndsAt: string | null;
-  quotaNote: string;
 }
 
 export const emailSenderService = {

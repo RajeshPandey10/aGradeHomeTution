@@ -32,7 +32,6 @@ export default function EmailSendersPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
-  const primary = senders.find((sender) => sender.provider === "cpanel");
 
   const fetchSenders = useCallback(
     async (isRefresh = false) => {
@@ -81,41 +80,6 @@ export default function EmailSendersPage() {
         </div>
       ) : (
         <>
-          {primary && (
-            <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    Current cPanel sending window
-                  </p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    {primary.quotaNote}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-blue-700">
-                    {primary.hourlyRemaining ?? "-"}
-                  </p>
-                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                    estimated sends remaining
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-3">
-                <span>
-                  Window sends: <strong>{primary.hourlySent}</strong> /{" "}
-                  {primary.hourlyLimit ?? "-"}
-                </span>
-                <span>
-                  Lifetime sends: <strong>{primary.emailsSent}</strong>
-                </span>
-                <span>
-                  Window ends:{" "}
-                  <strong>{formatDate(primary.hourlyWindowEndsAt)}</strong>
-                </span>
-              </div>
-            </div>
-          )}
           <DataTable
             columns={[
               {
