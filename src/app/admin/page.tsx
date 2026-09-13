@@ -24,6 +24,25 @@ interface Stat {
   bg: string;
 }
 
+interface ActivityDay {
+  date: string;
+  parentRequests: number;
+  teacherRequests: number;
+  payments: number;
+  revenue: number;
+}
+
+const getDateRange = (from: string, to: string) => {
+  const dates: string[] = [];
+  const cursor = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  while (cursor <= end) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+};
+
 export default function AdminDashboard() {
   const { isAuthenticated, initialize } = useAuthStore();
   const toast = useToast();
@@ -40,6 +59,7 @@ export default function AdminDashboard() {
     fulfilled: 0,
     revenue: 0,
   });
+  const [activityDays, setActivityDays] = useState<ActivityDay[]>([]);
   const [stats, setStats] = useState<Stat[]>([
     {
       label: "Total Parents",
@@ -133,6 +153,35 @@ export default function AdminDashboard() {
           0,
         ),
       });
+
+      const activity = getDateRange(fromDate, toDate).map((date) => {
+        const parentRequests = parentReqs.filter(
+          (request: any) => (request.createdAt || "").slice(0, 10) === date,
+        ).length;
+        const teacherRequests = (teacherReqsRes.data.data || []).filter(
+          (request: any) => (request.createdAt || "").slice(0, 10) === date,
+        ).length;
+        const payments = parentReqs.filter(
+          (request: any) =>
+            request.status === "fulfilled" &&
+            (request.paymentSlip?.paidAt || request.createdAt || "").slice(
+              0,
+              10,
+            ) === date,
+        );
+        return {
+          date,
+          parentRequests,
+          teacherRequests,
+          payments: payments.length,
+          revenue: payments.reduce(
+            (sum: number, request: any) =>
+              sum + (request.payment?.payable || 0),
+            0,
+          ),
+        };
+      });
+      setActivityDays(activity);
 
       setStats([
         {
@@ -336,6 +385,74 @@ export default function AdminDashboard() {
               </p>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="font-semibold text-slate-900">Daily Activity Log</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            A complete record for each day in the selected period
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-180">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/60">
+                {[
+                  "Date",
+                  "Parent Requests",
+                  "Teacher Requests",
+                  "Payments",
+                  "Revenue",
+                  "Total Activity",
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {activityDays.map((day) => {
+                const totalActivity =
+                  day.parentRequests + day.teacherRequests + day.payments;
+                return (
+                  <tr key={day.date} className="hover:bg-slate-50/60">
+                    <td className="px-5 py-3.5 text-sm font-medium text-slate-900">
+                      {new Date(`${day.date}T00:00:00`).toLocaleDateString(
+                        "en-US",
+                        {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        },
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-rose-600 font-medium">
+                      {day.parentRequests}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-amber-600 font-medium">
+                      {day.teacherRequests}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-blue-600 font-medium">
+                      {day.payments}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-emerald-600 font-medium">
+                      Rs. {day.revenue.toLocaleString()}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm font-semibold text-slate-900">
+                      {totalActivity}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
