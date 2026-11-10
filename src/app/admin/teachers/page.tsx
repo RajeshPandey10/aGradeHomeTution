@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Phone, Calendar, ShieldCheck, User, Trash2 } from "lucide-react";
+import { Mail, Phone, Calendar, ShieldCheck, User, Trash2, FileText } from "lucide-react";
+import { getImageUrl } from "@/lib/image";
 import { teacherService, TeacherProfile } from "@/services/teacherService";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
@@ -18,21 +19,25 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<TeacherProfile | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [counts, setCounts] = useState({ registered: 0, verified: 0 });
   const toast = useToast();
 
   const fetch = useCallback(async () => {
     try {
-      const res = await teacherService.getAll();
+      const res = await teacherService.getAll(search.trim() || undefined);
       setTeachers(res.data);
+      setCounts({ registered: res.registeredCount, verified: res.verifiedCount });
     } catch {
       toast.error("Failed to load teachers");
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, search]);
 
   useEffect(() => {
-    fetch();
+    const timer = setTimeout(fetch, 300);
+    return () => clearTimeout(timer);
   }, [fetch]);
 
   const handleDelete = useCallback(async () => {
@@ -53,6 +58,22 @@ export default function TeachersPage() {
   return (
     <div>
       <PageHeader title="Teachers" subtitle="All registered teachers" />
+
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search teachers by name"
+          className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <span className="text-sm text-slate-600">
+          Registered: <span className="font-semibold text-slate-900">{counts.registered}</span>
+        </span>
+        <span className="text-sm text-slate-600">
+          Verified: <span className="font-semibold text-slate-900">{counts.verified}</span>
+        </span>
+      </div>
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -142,7 +163,15 @@ export default function TeachersPage() {
               key: "actions",
               header: "",
               render: (t) => (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-1.5">
+                  {t.cv && (
+                    <ActionButton
+                      icon={FileText}
+                      label="View CV"
+                      onClick={() => window.open(getImageUrl(t.cv), "_blank", "noopener,noreferrer")}
+                      color="blue"
+                    />
+                  )}
                   <ActionButton
                     icon={Trash2}
                     label="Delete"

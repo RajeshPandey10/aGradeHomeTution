@@ -21,11 +21,21 @@ export interface TeacherProfile {
 }
 
 export const teacherService = {
-  getRequests: (status?: string) =>
-    handleRequest<TeacherProfile[]>(() => api.get("/api/admin/teacher-requests", { params: status ? { status } : {} })),
+  getRequests: (status?: string, search?: string) =>
+    handleRequest<TeacherProfile[]>(() =>
+      api.get("/api/admin/teacher-requests", {
+        params: { ...(status ? { status } : {}), ...(search ? { search } : {}) },
+      }),
+    ),
 
-  getAll: () =>
-    handleRequest<TeacherProfile[]>(() => api.get("/api/admin/teachers")),
+  getAll: async (search?: string) => {
+    const res = await api.get("/api/admin/teachers", { params: search ? { search } : {} });
+    return {
+      data: res.data.data as TeacherProfile[],
+      registeredCount: (res.data.registeredCount ?? 0) as number,
+      verifiedCount: (res.data.verifiedCount ?? 0) as number,
+    };
+  },
 
   approve: (profileId: string, status: string, rejectionReason?: string, rejectionRemarks?: string) =>
     handleRequest<TeacherProfile>(() => api.post("/api/admin/teachers/approve", { profileId, status, rejectionReason, rejectionRemarks })),

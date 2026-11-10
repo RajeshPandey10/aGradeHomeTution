@@ -59,20 +59,25 @@ export default function TeacherRequestsPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await teacherService.getRequests(statusFilter || undefined);
+      const res = await teacherService.getRequests(statusFilter || undefined, search.trim() || undefined);
       setRequests(res.data);
     } catch {
       toast.error("Failed to load teacher requests");
     } finally {
       setLoading(false);
     }
-  }, [toast, statusFilter]);
+  }, [toast, statusFilter, search]);
 
-  useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const timer = setTimeout(fetchData, 300);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
+  useEffect(() => { setLoading(true); }, [statusFilter]);
   useRealtimeRefresh(fetchData, ["teacher-profile:status-updated"]);
 
   const handleApprove = useCallback(async (profileId: string, status = "verified") => {
@@ -120,6 +125,14 @@ export default function TeacherRequestsPage() {
   return (
     <div>
       <PageHeader title="Teacher Verification" subtitle="Review and verify teacher profiles" />
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by name"
+        className="w-full max-w-xs mb-4 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
 
       {/* Status Filter Tabs */}
       <div className="flex gap-1.5 mb-5 flex-wrap">
