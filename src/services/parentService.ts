@@ -25,6 +25,24 @@ export interface ParentProfile {
   requirements?: string;
   latitude?: number;
   longitude?: number;
+  lockHistory?: {
+    teacher?: { _id: string; name: string; email: string; phoneNumber?: string };
+    teacherProfile?: {
+      name?: string;
+      address?: string;
+      phone?: string;
+      gender?: string;
+      academicQualification?: string;
+      experience?: string;
+      about?: string;
+      cv?: string;
+      identification?: string[];
+    };
+    action: string;
+    at: string;
+    expiresAt?: string | null;
+    reason?: string | null;
+  }[];
   createdAt?: string;
   user?: { name: string; email: string };
   parent?: { _id: string; name: string; email: string; phoneNumber?: string };

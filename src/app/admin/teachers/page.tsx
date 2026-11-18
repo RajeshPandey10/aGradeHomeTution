@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Mail, Phone, Calendar, ShieldCheck, User, Trash2, FileText } from "lucide-react";
+import { Mail, Phone, Calendar, ShieldCheck, User, Trash2, FileText, Eye, ExternalLink, ArrowLeft } from "lucide-react";
 import { getImageUrl } from "@/lib/image";
 import { teacherService, TeacherProfile } from "@/services/teacherService";
 import { useToast } from "@/hooks/useToast";
@@ -13,6 +13,7 @@ import {
   StatusBadge,
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { Modal } from "@/components/admin/Modal";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
@@ -21,6 +22,8 @@ export default function TeachersPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [counts, setCounts] = useState({ registered: 0, verified: 0 });
+  const [selected, setSelected] = useState<TeacherProfile | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<string | null>(null);
   const toast = useToast();
 
   const fetch = useCallback(async () => {
@@ -85,6 +88,71 @@ export default function TeachersPage() {
         confirmColor="red"
         loading={processing === deleteTarget?._id}
       />
+
+      <Modal
+        open={!!selected}
+        onClose={() => {
+          setSelected(null);
+          setViewingDoc(null);
+        }}
+        title={viewingDoc ? "Document Viewer" : "Teacher Details"}
+        wide={!!viewingDoc}
+      >
+        {selected && !viewingDoc && (
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-2">
+              <StatusBadge status={selected.status} />
+              <span className="text-xs text-slate-400">
+                Registered {new Date(selected.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            {[
+              ["Name", selected.name || selected.user?.name],
+              ["Email", selected.user?.email],
+              ["Phone", selected.phone || selected.user?.phoneNumber || "Not provided"],
+              ["Gender", selected.gender],
+              ["Address", selected.address],
+              ["Qualification", selected.academicQualification],
+              ["Experience", selected.experience],
+              ["About", selected.about],
+            ].filter(([, value]) => value).map(([label, value]) => (
+              <div key={label}>
+                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">{label}</span>
+                <p className="mt-0.5 text-slate-900">{value}</p>
+              </div>
+            ))}
+            <div className="border-t border-slate-200 pt-3 space-y-2">
+              {selected.cv && (
+                <button onClick={() => setViewingDoc(selected.cv!)} className="inline-flex items-center gap-1 text-blue-600 hover:underline mr-4">
+                  <FileText size={14} /> View CV <ExternalLink size={12} />
+                </button>
+              )}
+              {selected.identification?.map((url, index) => (
+                <button key={url} onClick={() => setViewingDoc(url)} className="inline-flex items-center gap-1 text-blue-600 hover:underline mr-4">
+                  <FileText size={14} /> View ID {index + 1} <ExternalLink size={12} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {selected && viewingDoc && (
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+              <button onClick={() => setViewingDoc(null)} className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm">
+                <ArrowLeft size={16} /> Back to profile
+              </button>
+              <a href={getImageUrl(viewingDoc)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                Open in new tab
+              </a>
+            </div>
+            {viewingDoc.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) ? (
+              <img src={getImageUrl(viewingDoc)} alt="Teacher document" className="max-w-full max-h-[70vh] mx-auto object-contain rounded-lg" />
+            ) : (
+              <iframe src={getImageUrl(viewingDoc)} title="Teacher document" className="w-full min-h-[70vh] rounded-lg border border-slate-200" />
+            )}
+          </div>
+        )}
+      </Modal>
 
       {loading ? (
         <Loading />
@@ -164,14 +232,7 @@ export default function TeachersPage() {
               header: "",
               render: (t) => (
                 <div className="flex justify-end gap-1.5">
-                  {t.cv && (
-                    <ActionButton
-                      icon={FileText}
-                      label="View CV"
-                      onClick={() => window.open(getImageUrl(t.cv), "_blank", "noopener,noreferrer")}
-                      color="blue"
-                    />
-                  )}
+                  <ActionButton icon={Eye} label="View" onClick={() => setSelected(t)} color="blue" />
                   <ActionButton
                     icon={Trash2}
                     label="Delete"

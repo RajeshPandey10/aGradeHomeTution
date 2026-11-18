@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/authStore";
 import Sidebar from "@/components/admin/Sidebar";
 import Navbar from "@/components/admin/Navbar";
 import { Loader2 } from "lucide-react";
+import AdminEventNotifications from "@/components/admin/AdminEventNotifications";
 
 export default function AdminLayout({
   children,
@@ -36,6 +37,7 @@ export default function AdminLayout({
   return (
     <div className="flex h-[100dvh] min-h-0 overflow-hidden bg-slate-50">
       <Toaster richColors position="top-right" />
+      <AdminEventNotifications />
       <Sidebar />
       <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden">
         <Navbar />

@@ -10,6 +10,7 @@ import {
   TrendingUp,
   CreditCard,
   DollarSign,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useRealtimeRefresh } from "@/lib/socket";
@@ -86,6 +87,13 @@ export default function AdminDashboard() {
       icon: GraduationCap,
       color: "text-emerald-600",
       bg: "bg-emerald-100",
+    },
+    {
+      label: "Verified Teachers",
+      value: 0,
+      icon: ShieldCheck,
+      color: "text-teal-600",
+      bg: "bg-teal-100",
     },
     {
       label: "Pending Teacher Reqs",
@@ -201,10 +209,17 @@ export default function AdminDashboard() {
         },
         {
           label: "Total Teachers",
-          value: teachersRes.data.data?.length || 0,
+          value: teachersRes.data.registeredCount ?? teachersRes.data.data?.length ?? 0,
           icon: GraduationCap,
           color: "text-emerald-600",
           bg: "bg-emerald-100",
+        },
+        {
+          label: "Verified Teachers",
+          value: teachersRes.data.verifiedCount ?? 0,
+          icon: ShieldCheck,
+          color: "text-teal-600",
+          bg: "bg-teal-100",
         },
         {
           label: "Pending Teacher Reqs",

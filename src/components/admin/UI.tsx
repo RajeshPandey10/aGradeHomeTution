@@ -33,7 +33,7 @@ export const ActionButton = memo(function ActionButton({
   icon: React.ComponentType<{ size?: number }>;
   label: string;
   onClick: () => void;
-  color?: "blue" | "red" | "emerald" | "amber" | "slate";
+  color?: "blue" | "red" | "emerald" | "amber" | "slate" | "purple";
   disabled?: boolean;
 }) {
   const colorClasses: Record<string, string> = {
@@ -42,6 +42,7 @@ export const ActionButton = memo(function ActionButton({
     emerald: "text-emerald-600 hover:bg-emerald-50 border-emerald-200",
     amber: "text-amber-600 hover:bg-amber-50 border-amber-200",
     slate: "text-slate-600 hover:bg-slate-50 border-slate-200",
+    purple: "text-purple-600 hover:bg-purple-50 border-purple-200",
   };
 
   return (

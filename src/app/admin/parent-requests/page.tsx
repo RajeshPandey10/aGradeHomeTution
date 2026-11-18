@@ -16,6 +16,7 @@ import {
   BookOpen,
   Percent,
   AlertTriangle,
+  LockKeyhole,
 } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { parentService, ParentProfile } from "@/services/parentService";
@@ -30,6 +31,11 @@ import {
 } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import dynamic from "next/dynamic";
+
+const LocationPicker = dynamic(() => import("@/components/admin/LocationPicker"), {
+  ssr: false,
+});
 
 function DetailRow({
   label,
@@ -53,7 +59,6 @@ function DetailRow({
     </div>
   );
 }
-
 function SectionHeader({ title }: { title: string }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-600 border-b border-slate-200 pb-1 pt-3">
@@ -66,6 +71,7 @@ export default function ParentRequestsPage() {
   const [requests, setRequests] = useState<ParentProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ParentProfile | null>(null);
+  const [lockTarget, setLockTarget] = useState<ParentProfile | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ParentProfile | null>(null);
   const [editing, setEditing] = useState<ParentProfile | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -111,6 +117,15 @@ export default function ParentRequestsPage() {
       setSelected(res.data);
     } catch {
       setSelected(r);
+    }
+  }, []);
+
+  const handleLockView = useCallback(async (r: ParentProfile) => {
+    try {
+      const res = await parentService.getRequestDetail(r._id);
+      setLockTarget(res.data);
+    } catch {
+      setLockTarget(r);
     }
   }, []);
 
@@ -196,6 +211,8 @@ export default function ParentRequestsPage() {
         payload.numberOfDays =
           parseInt(payload.numberOfDays as string, 10) || null;
       }
+      if (payload.latitude) payload.latitude = Number(payload.latitude);
+      if (payload.longitude) payload.longitude = Number(payload.longitude);
       await parentService.update(editing._id, payload);
       toast.success("Parent request updated");
       setEditing(null);
@@ -212,6 +229,8 @@ export default function ParentRequestsPage() {
       name: r.name || "",
       phone: r.phone || "",
       location: r.location || "",
+      latitude: r.latitude?.toString() || "",
+      longitude: r.longitude?.toString() || "",
       duration: r.duration || "",
       tuitionType: r.tuitionType || "",
       daysPerWeek: r.daysPerWeek || "",
@@ -257,7 +276,6 @@ export default function ParentRequestsPage() {
         title="Parent Requests"
         subtitle="Review and approve tuition requests from parents"
       />
-
       <div className="flex gap-1.5 mb-5 flex-wrap">
         {[
           { label: "All", value: "" },
@@ -281,6 +299,56 @@ export default function ParentRequestsPage() {
       </div>
 
       {/* Detail Modal */}
+      <Modal
+        open={!!lockTarget}
+        onClose={() => setLockTarget(null)}
+        title="Lock History"
+        wide
+      >
+        {lockTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500">
+              All teacher lock, application, release, expiry, and fulfillment events for <strong>{lockTarget.name}</strong>.
+            </p>
+            {lockTarget.lockHistory?.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-400">
+                      <th className="px-3 py-2">Teacher</th>
+                      <th className="px-3 py-2">Action</th>
+                      <th className="px-3 py-2">Date & time</th>
+                      <th className="px-3 py-2">Expiry / reason</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...lockTarget.lockHistory].reverse().map((entry, index) => (
+                      <tr key={`${entry.at}-${index}`} className="border-b border-slate-100">
+                        <td className="px-3 py-3">
+                          <p className="font-medium text-slate-900">{entry.teacher?.name || "Unknown teacher"}</p>
+                          <p className="text-xs text-slate-500">{entry.teacher?.email || "—"}</p>
+                        </td>
+                        <td className="px-3 py-3"><StatusBadge status={entry.action} /></td>
+                        <td className="px-3 py-3 text-slate-600">{new Date(entry.at).toLocaleString()}</td>
+                        <td className="px-3 py-3 text-slate-500">
+                          {entry.expiresAt ? `Until ${new Date(entry.expiresAt).toLocaleString()}` : entry.reason || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          {entry.teacher && (
+                            <ActionButton icon={Eye} label="View" onClick={() => handleView({ ...lockTarget, assignedTeacher: entry.teacher } as ParentProfile)} color="blue" />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <EmptyState message="No lock history recorded for this request" />}
+          </div>
+        )}
+      </Modal>
+
       <Modal
         open={!!selected}
         onClose={() => setSelected(null)}
@@ -715,6 +783,18 @@ export default function ParentRequestsPage() {
                   setEditForm((f) => ({ ...f, location: e.target.value }))
                 }
               />
+              <LocationPicker
+                latitude={Number(editForm.latitude) || null}
+                longitude={Number(editForm.longitude) || null}
+                onChange={({ label, latitude, longitude }) =>
+                  setEditForm((f) => ({
+                    ...f,
+                    location: label,
+                    latitude: String(latitude),
+                    longitude: String(longitude),
+                  }))
+                }
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1071,6 +1151,12 @@ export default function ParentRequestsPage() {
                       color="blue"
                     />
                   )}
+                  <ActionButton
+                    icon={LockKeyhole}
+                    label="Lock"
+                    onClick={() => handleLockView(r)}
+                    color="purple"
+                  />
                   <ActionButton
                     icon={Pencil}
                     label="Edit"
