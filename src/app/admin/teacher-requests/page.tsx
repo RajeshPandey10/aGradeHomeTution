@@ -1,45 +1,31 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle, XCircle, Eye, ExternalLink, FileText, ArrowLeft, Loader2, AlertTriangle, Phone } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Eye,
+  ExternalLink,
+  FileText,
+  ArrowLeft,
+  Loader2,
+  AlertTriangle,
+  Phone,
+} from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { teacherService, TeacherProfile } from "@/services/teacherService";
 import { useToast } from "@/hooks/useToast";
 import { getImageUrl } from "@/lib/image";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
-import { ActionButton, ActionButtonSolid, Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
+import {
+  ActionButton,
+  ActionButtonSolid,
+  Loading,
+  EmptyState,
+  StatusBadge,
+} from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
-
-function PdfViewer({ url }: { url: string }) {
-  const [failed, setFailed] = useState(false);
-  const resolvedUrl = getImageUrl(url);
-  if (failed) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-64 gap-4 bg-slate-50 rounded-lg border border-slate-200 p-6 text-center">
-        <FileText size={40} className="text-slate-400" />
-        <p className="text-slate-600 text-sm">Could not preview this PDF in the browser.</p>
-        <a
-          href={resolvedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
-        >
-          <ExternalLink size={16} /> Open / Download PDF
-        </a>
-      </div>
-    );
-  }
-  return (
-    <iframe
-      key={resolvedUrl}
-      src={resolvedUrl}
-      className="w-full rounded-lg border border-slate-200"
-      style={{ minHeight: "75vh" }}
-      title="PDF viewer"
-      onError={() => setFailed(true)}
-    />
-  );
-}
+import PdfViewer from "@/components/admin/pdf-viewer";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -64,7 +50,10 @@ export default function TeacherRequestsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await teacherService.getRequests(statusFilter || undefined, search.trim() || undefined);
+      const res = await teacherService.getRequests(
+        statusFilter || undefined,
+        search.trim() || undefined,
+      );
       setRequests(res.data);
     } catch {
       toast.error("Failed to load teacher requests");
@@ -77,22 +66,31 @@ export default function TeacherRequestsPage() {
     const timer = setTimeout(fetchData, 300);
     return () => clearTimeout(timer);
   }, [fetchData]);
-  useEffect(() => { setLoading(true); }, [statusFilter]);
+  useEffect(() => {
+    setLoading(true);
+  }, [statusFilter]);
   useRealtimeRefresh(fetchData, ["teacher-profile:status-updated"]);
 
-  const handleApprove = useCallback(async (profileId: string, status = "verified") => {
-    setProcessing(profileId);
-    try {
-      await teacherService.approve(profileId, status);
-      toast.success(status === "verified" ? "Teacher approved successfully" : "Profile sent for review");
-      setSelected(null);
-      fetchData();
-    } catch {
-      toast.error("Failed to update teacher status");
-    } finally {
-      setProcessing(null);
-    }
-  }, [fetchData, toast]);
+  const handleApprove = useCallback(
+    async (profileId: string, status = "verified") => {
+      setProcessing(profileId);
+      try {
+        await teacherService.approve(profileId, status);
+        toast.success(
+          status === "verified"
+            ? "Teacher approved successfully"
+            : "Profile sent for review",
+        );
+        setSelected(null);
+        fetchData();
+      } catch {
+        toast.error("Failed to update teacher status");
+      } finally {
+        setProcessing(null);
+      }
+    },
+    [fetchData, toast],
+  );
 
   const handleReject = useCallback(async () => {
     if (!rejectTarget) return;
@@ -102,7 +100,12 @@ export default function TeacherRequestsPage() {
     }
     setProcessing(rejectTarget._id);
     try {
-      await teacherService.approve(rejectTarget._id, "rejected", rejectionReason.trim(), rejectionRemarks.trim() || undefined);
+      await teacherService.approve(
+        rejectTarget._id,
+        "rejected",
+        rejectionReason.trim(),
+        rejectionRemarks.trim() || undefined,
+      );
       toast.success("Teacher request rejected");
       setRejectTarget(null);
       setRejectionReason("");
@@ -124,7 +127,10 @@ export default function TeacherRequestsPage() {
 
   return (
     <div>
-      <PageHeader title="Teacher Verification" subtitle="Review and verify teacher profiles" />
+      <PageHeader
+        title="Teacher Verification"
+        subtitle="Review and verify teacher profiles"
+      />
 
       <input
         type="text"
@@ -154,7 +160,10 @@ export default function TeacherRequestsPage() {
       {/* Profile Detail Modal */}
       <Modal
         open={!!selected}
-        onClose={() => { setSelected(null); setViewingDoc(null); }}
+        onClose={() => {
+          setSelected(null);
+          setViewingDoc(null);
+        }}
         title={viewingDoc ? "Document Viewer" : "Profile Details"}
         wide={!!viewingDoc}
       >
@@ -163,41 +172,65 @@ export default function TeacherRequestsPage() {
             <div className="flex items-center gap-2 mb-1">
               <StatusBadge status={selected.status} />
               {selected.createdAt && (
-                <span className="text-slate-400 text-xs">Submitted {new Date(selected.createdAt).toLocaleDateString()}</span>
+                <span className="text-slate-400 text-xs">
+                  Submitted {new Date(selected.createdAt).toLocaleDateString()}
+                </span>
               )}
             </div>
 
             {[
               ["Name", selected.name || selected.user?.name],
               ["Email", selected.user?.email],
-              ["Phone", selected.phone || selected.user?.phoneNumber || "Not provided"],
+              [
+                "Phone",
+                selected.phone || selected.user?.phoneNumber || "Not provided",
+              ],
               ["Gender", selected.gender],
               ["Address", selected.address],
               ["Qualification", selected.academicQualification],
               ["Experience", selected.experience],
               ["About", selected.about],
-            ].filter(([, v]) => v).map(([label, value]) => (
-              <div key={label as string}>
-                <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">{label as string}</span>
-                <p className={`mt-0.5 ${value === "Not provided" ? "text-slate-400 italic" : "text-slate-900"}`}>
-                  {label === "Phone" && <Phone size={13} className="inline mr-1.5 -mt-0.5" />}
-                  {value as string}
-                </p>
-              </div>
-            ))}
+            ]
+              .filter(([, v]) => v)
+              .map(([label, value]) => (
+                <div key={label as string}>
+                  <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">
+                    {label as string}
+                  </span>
+                  <p
+                    className={`mt-0.5 ${value === "Not provided" ? "text-slate-400 italic" : "text-slate-900"}`}
+                  >
+                    {label === "Phone" && (
+                      <Phone size={13} className="inline mr-1.5 -mt-0.5" />
+                    )}
+                    {value as string}
+                  </p>
+                </div>
+              ))}
 
             {selected.status === "rejected" && selected.rejectionReason && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-2">
-                <span className="font-medium text-red-600 text-xs uppercase tracking-wider">Rejection Reason</span>
-                <p className="text-red-800 mt-0.5 font-medium">{selected.rejectionReason}</p>
+                <span className="font-medium text-red-600 text-xs uppercase tracking-wider">
+                  Rejection Reason
+                </span>
+                <p className="text-red-800 mt-0.5 font-medium">
+                  {selected.rejectionReason}
+                </p>
                 {selected.rejectionRemarks && (
                   <>
-                    <span className="font-medium text-red-600 text-xs uppercase tracking-wider mt-2 block">Remarks</span>
-                    <p className="text-red-700 mt-0.5">{selected.rejectionRemarks}</p>
+                    <span className="font-medium text-red-600 text-xs uppercase tracking-wider mt-2 block">
+                      Remarks
+                    </span>
+                    <p className="text-red-700 mt-0.5">
+                      {selected.rejectionRemarks}
+                    </p>
                   </>
                 )}
                 {selected.rejectedAt && (
-                  <p className="text-red-400 text-xs mt-2">Rejected on {new Date(selected.rejectedAt).toLocaleDateString()}</p>
+                  <p className="text-red-400 text-xs mt-2">
+                    Rejected on{" "}
+                    {new Date(selected.rejectedAt).toLocaleDateString()}
+                  </p>
                 )}
               </div>
             )}
@@ -206,9 +239,14 @@ export default function TeacherRequestsPage() {
               const cvUrl = selected.cv;
               return cvUrl ? (
                 <div>
-                  <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">CV</span>
+                  <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">
+                    CV
+                  </span>
                   <p className="mt-0.5">
-                    <button onClick={() => setViewingDoc(getImageUrl(cvUrl))} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
+                    <button
+                      onClick={() => setViewingDoc(getImageUrl(cvUrl))}
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm"
+                    >
                       <FileText size={14} /> View CV <ExternalLink size={12} />
                     </button>
                   </p>
@@ -219,11 +257,18 @@ export default function TeacherRequestsPage() {
               const ids = selected.identification;
               return ids?.length ? (
                 <div>
-                  <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Identification</span>
+                  <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">
+                    Identification
+                  </span>
                   <div className="mt-0.5 space-y-1">
                     {ids.map((url, i) => (
-                      <button key={i} onClick={() => setViewingDoc(getImageUrl(url))} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
-                        <FileText size={14} /> ID {i + 1} <ExternalLink size={12} />
+                      <button
+                        key={i}
+                        onClick={() => setViewingDoc(getImageUrl(url))}
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm"
+                      >
+                        <FileText size={14} /> ID {i + 1}{" "}
+                        <ExternalLink size={12} />
                       </button>
                     ))}
                   </div>
@@ -231,21 +276,56 @@ export default function TeacherRequestsPage() {
               ) : null;
             })()}
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200 mt-4">
-              <ActionButton icon={XCircle} label="Close" onClick={() => setSelected(null)} color="slate" />
+              <ActionButton
+                icon={XCircle}
+                label="Close"
+                onClick={() => setSelected(null)}
+                color="slate"
+              />
               {selected.status === "in_review" && (
                 <>
-                  <ActionButtonSolid icon={XCircle} label="Reject" onClick={() => openReject(selected)} disabled={processing === selected._id} color="red" />
-                  <ActionButtonSolid icon={CheckCircle} label="Approve" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+                  <ActionButtonSolid
+                    icon={XCircle}
+                    label="Reject"
+                    onClick={() => openReject(selected)}
+                    disabled={processing === selected._id}
+                    color="red"
+                  />
+                  <ActionButtonSolid
+                    icon={CheckCircle}
+                    label="Approve"
+                    onClick={() => handleApprove(selected._id)}
+                    disabled={processing === selected._id}
+                    color="emerald"
+                  />
                 </>
               )}
               {selected.status === "rejected" && (
                 <>
-                  <ActionButtonSolid icon={XCircle} label="Re-reject" onClick={() => openReject(selected)} disabled={processing === selected._id} color="red" />
-                  <ActionButtonSolid icon={CheckCircle} label="Re-approve" onClick={() => handleApprove(selected._id)} disabled={processing === selected._id} color="emerald" />
+                  <ActionButtonSolid
+                    icon={XCircle}
+                    label="Re-reject"
+                    onClick={() => openReject(selected)}
+                    disabled={processing === selected._id}
+                    color="red"
+                  />
+                  <ActionButtonSolid
+                    icon={CheckCircle}
+                    label="Re-approve"
+                    onClick={() => handleApprove(selected._id)}
+                    disabled={processing === selected._id}
+                    color="emerald"
+                  />
                 </>
               )}
               {selected.status === "unverified" && (
-                <ActionButtonSolid icon={CheckCircle} label="Send for Review" onClick={() => handleApprove(selected._id, "in_review")} disabled={processing === selected._id} color="blue" />
+                <ActionButtonSolid
+                  icon={CheckCircle}
+                  label="Send for Review"
+                  onClick={() => handleApprove(selected._id, "in_review")}
+                  disabled={processing === selected._id}
+                  color="blue"
+                />
               )}
             </div>
           </div>
@@ -253,16 +333,28 @@ export default function TeacherRequestsPage() {
         {selected && viewingDoc && (
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
-              <button onClick={() => setViewingDoc(null)} className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm">
+              <button
+                onClick={() => setViewingDoc(null)}
+                className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm"
+              >
                 <ArrowLeft size={16} /> Back to profile
               </button>
-              <a href={getImageUrl(viewingDoc)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+              <a
+                href={getImageUrl(viewingDoc)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1"
+              >
                 <ExternalLink size={14} /> Open in new tab
               </a>
             </div>
             {viewingDoc.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) ? (
               <div className="flex items-center justify-center bg-slate-100 rounded-lg min-h-125 p-4">
-                <img src={viewingDoc} alt="Document" className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-md" />
+                <img
+                  src={viewingDoc}
+                  alt="Document"
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-md"
+                />
               </div>
             ) : (
               <PdfViewer url={viewingDoc} />
@@ -274,15 +366,32 @@ export default function TeacherRequestsPage() {
       {/* Rejection Dialog with Reason + Remarks */}
       {rejectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/40" onClick={() => { if (!processing) { setRejectTarget(null); } }} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 bg-black/40"
+            onClick={() => {
+              if (!processing) {
+                setRejectTarget(null);
+              }
+            }}
+          />
+          <div
+            className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex flex-col items-center text-center mb-4">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-red-100 text-red-600">
                 <AlertTriangle size={24} />
               </div>
-              <h2 className="text-lg font-semibold text-slate-900">Reject Teacher Profile</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Reject Teacher Profile
+              </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Rejecting <span className="font-medium text-slate-700">{rejectTarget.name || rejectTarget.user?.name}</span>. The teacher will be notified via email, push notification, and in-app notification.
+                Rejecting{" "}
+                <span className="font-medium text-slate-700">
+                  {rejectTarget.name || rejectTarget.user?.name}
+                </span>
+                . The teacher will be notified via email, push notification, and
+                in-app notification.
               </p>
             </div>
             <div className="space-y-3">
@@ -316,7 +425,11 @@ export default function TeacherRequestsPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => { setRejectTarget(null); setRejectionReason(""); setRejectionRemarks(""); }}
+                onClick={() => {
+                  setRejectTarget(null);
+                  setRejectionReason("");
+                  setRejectionRemarks("");
+                }}
                 disabled={!!processing}
                 className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer"
               >
@@ -335,42 +448,121 @@ export default function TeacherRequestsPage() {
         </div>
       )}
 
-      {loading ? <Loading /> : requests.length === 0 ? <EmptyState message={statusFilter ? `No ${statusFilter.replace(/_/g, " ")} requests` : "No verification requests"} /> : (
+      {loading ? (
+        <Loading />
+      ) : requests.length === 0 ? (
+        <EmptyState
+          message={
+            statusFilter
+              ? `No ${statusFilter.replace(/_/g, " ")} requests`
+              : "No verification requests"
+          }
+        />
+      ) : (
         <DataTable
           columns={[
-            { key: "name", header: "Name", render: (r) => <span className="font-medium text-slate-900">{r.name || r.user?.name}</span> },
-            { key: "email", header: "Email", render: (r) => <span className="text-slate-500">{r.user?.email || "—"}</span> },
-            { key: "phone", header: "Phone", render: (r) => (
-              <span className="inline-flex items-center gap-1.5 text-slate-500"><Phone size={13} />{r.phone || r.user?.phoneNumber || "Not provided"}</span>
-            )},
-            { key: "qualification", header: "Qualification", render: (r) => (
-              <span className="text-slate-500 max-w-55 inline-block truncate">{r.academicQualification || "—"}</span>
-            )},
-            { key: "status", header: "Status", render: (r) => (
-              <div>
-                <StatusBadge status={r.status} />
-                {r.status === "rejected" && r.rejectionReason && (
-                  <p className="text-red-500 text-xs mt-0.5 max-w-40 truncate" title={r.rejectionReason}>{r.rejectionReason}</p>
-                )}
-              </div>
-            )},
-            { key: "actions", header: "", render: (r) => (
-              <div className="flex gap-1.5 justify-end">
-                <ActionButton icon={Eye} label="View" onClick={() => setSelected(r)} color="blue" />
-                {r.status === "in_review" && (
-                  <>
-                    <ActionButton icon={XCircle} label="Reject" onClick={() => openReject(r)} disabled={processing === r._id} color="red" />
-                    <ActionButton icon={CheckCircle} label="Approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
-                  </>
-                )}
-                {r.status === "rejected" && (
-                  <ActionButton icon={CheckCircle} label="Re-approve" onClick={() => handleApprove(r._id)} disabled={processing === r._id} color="emerald" />
-                )}
-                {r.status === "unverified" && (
-                  <ActionButton icon={CheckCircle} label="Review" onClick={() => handleApprove(r._id, "in_review")} disabled={processing === r._id} color="blue" />
-                )}
-              </div>
-            )},
+            {
+              key: "name",
+              header: "Name",
+              render: (r) => (
+                <span className="font-medium text-slate-900">
+                  {r.name || r.user?.name}
+                </span>
+              ),
+            },
+            {
+              key: "email",
+              header: "Email",
+              render: (r) => (
+                <span className="text-slate-500">{r.user?.email || "—"}</span>
+              ),
+            },
+            {
+              key: "phone",
+              header: "Phone",
+              render: (r) => (
+                <span className="inline-flex items-center gap-1.5 text-slate-500">
+                  <Phone size={13} />
+                  {r.phone || r.user?.phoneNumber || "Not provided"}
+                </span>
+              ),
+            },
+            {
+              key: "qualification",
+              header: "Qualification",
+              render: (r) => (
+                <span className="text-slate-500 max-w-55 inline-block truncate">
+                  {r.academicQualification || "—"}
+                </span>
+              ),
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (r) => (
+                <div>
+                  <StatusBadge status={r.status} />
+                  {r.status === "rejected" && r.rejectionReason && (
+                    <p
+                      className="text-red-500 text-xs mt-0.5 max-w-40 truncate"
+                      title={r.rejectionReason}
+                    >
+                      {r.rejectionReason}
+                    </p>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: "actions",
+              header: "",
+              render: (r) => (
+                <div className="flex gap-1.5 justify-end">
+                  <ActionButton
+                    icon={Eye}
+                    label="View"
+                    onClick={() => setSelected(r)}
+                    color="blue"
+                  />
+                  {r.status === "in_review" && (
+                    <>
+                      <ActionButton
+                        icon={XCircle}
+                        label="Reject"
+                        onClick={() => openReject(r)}
+                        disabled={processing === r._id}
+                        color="red"
+                      />
+                      <ActionButton
+                        icon={CheckCircle}
+                        label="Approve"
+                        onClick={() => handleApprove(r._id)}
+                        disabled={processing === r._id}
+                        color="emerald"
+                      />
+                    </>
+                  )}
+                  {r.status === "rejected" && (
+                    <ActionButton
+                      icon={CheckCircle}
+                      label="Re-approve"
+                      onClick={() => handleApprove(r._id)}
+                      disabled={processing === r._id}
+                      color="emerald"
+                    />
+                  )}
+                  {r.status === "unverified" && (
+                    <ActionButton
+                      icon={CheckCircle}
+                      label="Review"
+                      onClick={() => handleApprove(r._id, "in_review")}
+                      disabled={processing === r._id}
+                      color="blue"
+                    />
+                  )}
+                </div>
+              ),
+            },
           ]}
           data={requests}
         />
