@@ -29,6 +29,8 @@ import {
 } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 export default function NoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -54,6 +56,7 @@ export default function NoticesPage() {
   const [descPreview, setDescPreview] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Notice | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -220,6 +223,15 @@ export default function NoticesPage() {
   }, [deleteTarget, fetch, toast]);
 
   const isUploading = saving && uploading;
+
+  const filtered = notices.filter((n) =>
+    matchesSearch(search, [
+      n.title,
+      n.subtitle,
+      // description is HTML — match its text, not the markup
+      n.description?.replace(/<[^>]*>/g, " "),
+    ]),
+  );
 
   return (
     <div>
@@ -492,10 +504,24 @@ export default function NoticesPage() {
         loading={deleting}
       />
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search title, subtitle, description…"
+        shown={filtered.length}
+        total={notices.length}
+      />
+
       {loading ? (
         <Loading />
-      ) : notices.length === 0 ? (
-        <EmptyState message="No notices found" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          message={
+            search.trim()
+              ? `No notices match "${search.trim()}"`
+              : "No notices found"
+          }
+        />
       ) : (
         <DataTable
           columns={[
@@ -610,7 +636,7 @@ export default function NoticesPage() {
               ),
             },
           ]}
-          data={notices}
+          data={filtered}
         />
       )}
     </div>

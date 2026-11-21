@@ -12,6 +12,8 @@ import {
   StatusBadge,
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 type FormData = {
   question: string;
@@ -35,6 +37,7 @@ export default function FaqItemsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FaqItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetchData = useCallback(async () => {
@@ -125,6 +128,10 @@ export default function FaqItemsPage() {
       toast.error("Failed to update FAQ item");
     }
   };
+
+  const filtered = items.filter((i) =>
+    matchesSearch(search, [i.question, i.answer]),
+  );
 
   return (
     <div>
@@ -257,10 +264,24 @@ export default function FaqItemsPage() {
         loading={deleting}
       />
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search question, answer…"
+        shown={filtered.length}
+        total={items.length}
+      />
+
       {loading ? (
         <Loading />
-      ) : items.length === 0 ? (
-        <EmptyState message="No FAQ items yet" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          message={
+            search.trim()
+              ? `No FAQ items match "${search.trim()}"`
+              : "No FAQ items yet"
+          }
+        />
       ) : (
         <DataTable
           columns={[
@@ -320,7 +341,7 @@ export default function FaqItemsPage() {
               ),
             },
           ]}
-          data={items}
+          data={filtered}
         />
       )}
     </div>

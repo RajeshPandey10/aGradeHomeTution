@@ -90,6 +90,26 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
     label: "eSewa Payment",
     color: "bg-green-100 text-green-700",
   },
+  booking_approved: {
+    label: "Booking Accepted",
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  booking_declined: {
+    label: "Booking Declined",
+    color: "bg-red-100 text-red-700",
+  },
+  online_verification_submitted: {
+    label: "Online Form Submitted",
+    color: "bg-blue-100 text-blue-700",
+  },
+  online_verification_approved: {
+    label: "Online Teaching Approved",
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  online_verification_rejected: {
+    label: "Online Teaching Rejected",
+    color: "bg-red-100 text-red-700",
+  },
   account_deleted: {
     label: "Account Deleted",
     color: "bg-red-100 text-red-700",
@@ -109,6 +129,11 @@ const ACTION_OPTIONS = [
   { value: "refund_executed", label: "Refund Executed" },
   { value: "payment_manual_submitted", label: "Manual Payment" },
   { value: "payment_esewa_verified", label: "eSewa Payment" },
+  { value: "booking_approved", label: "Booking Accepted" },
+  { value: "booking_declined", label: "Booking Declined" },
+  { value: "online_verification_submitted", label: "Online Form Submitted" },
+  { value: "online_verification_approved", label: "Online Teaching Approved" },
+  { value: "online_verification_rejected", label: "Online Teaching Rejected" },
   { value: "account_deleted", label: "Account Deleted" },
 ];
 

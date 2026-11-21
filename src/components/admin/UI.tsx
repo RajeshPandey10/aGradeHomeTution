@@ -8,7 +8,13 @@ const colors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
   vacant: "bg-blue-100 text-blue-700",
   ongoing: "bg-purple-100 text-purple-700",
+  under_review: "bg-orange-100 text-orange-700",
+  not_submitted: "bg-slate-100 text-slate-600",
   fulfilled: "bg-emerald-100 text-emerald-700",
+  // lock history actions
+  paid: "bg-orange-100 text-orange-700",
+  approved: "bg-emerald-100 text-emerald-700",
+  declined: "bg-red-100 text-red-700",
   refunded: "bg-orange-100 text-orange-700",
   new: "bg-blue-100 text-blue-700",
   read: "bg-slate-100 text-slate-600",
@@ -103,5 +109,43 @@ export const Loading = memo(function Loading() {
     <div className="flex items-center justify-center py-16">
       <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
+  );
+});
+
+/** A teacher's photo, or their initials when they haven't uploaded one. */
+export const TeacherAvatar = memo(function TeacherAvatar({
+  name,
+  src,
+  size = 36,
+}: {
+  name?: string | null;
+  /** Already resolved with getImageUrl. */
+  src?: string | null;
+  size?: number;
+}) {
+  const initials =
+    (name || "?")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() || "")
+      .join("") || "?";
+  const style = { width: size, height: size };
+  return src ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={name ? `${name}'s photo` : "Teacher photo"}
+      style={style}
+      className="rounded-full object-cover shrink-0 bg-slate-100 border border-slate-200"
+    />
+  ) : (
+    <span
+      style={{ ...style, fontSize: Math.round(size * 0.36) }}
+      className="rounded-full shrink-0 inline-flex items-center justify-center bg-blue-100 text-blue-700 font-semibold"
+      aria-hidden
+    >
+      {initials}
+    </span>
   );
 });

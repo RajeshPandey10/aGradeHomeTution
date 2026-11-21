@@ -11,19 +11,135 @@ import {
   CreditCard,
   DollarSign,
   ShieldCheck,
+  UserPlus,
+  UserCheck,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { useToast } from "@/hooks/useToast";
 import { StatCard, PageHeader } from "@/components/admin/DataTable";
 
-interface Stat {
+type StatKey =
+  | "parents"
+  | "teachersSignedUp"
+  | "teachersWithCv"
+  | "teachersVerified"
+  | "teachersToReview"
+  | "parentRequestsToApprove"
+  | "bookingsToReview"
+  | "tuitionsBooked"
+  | "feesEarned";
+
+const formatRupees = (amount: number) => `Rs. ${amount.toLocaleString("en-IN")}`;
+
+// Each card says in plain words what its number counts and links to the page
+// behind it. The three teacher cards read as a funnel:
+// signed up → uploaded a CV → verified.
+const STAT_CARDS: {
+  key: StatKey;
   label: string;
-  value: number;
-  icon: React.ComponentType<{ size?: number }>;
+  description: string;
+  href: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
   bg: string;
-}
+  format?: (value: number) => string;
+}[] = [
+  {
+    key: "parents",
+    label: "Parents",
+    description: "Parent accounts registered",
+    href: "/admin/parents",
+    icon: Users,
+    color: "text-blue-600",
+    bg: "bg-blue-100",
+  },
+  {
+    key: "teachersSignedUp",
+    label: "Teachers signed up",
+    description: "Every teacher account, with or without a CV",
+    href: "/admin/teachers?view=no-profile",
+    icon: UserPlus,
+    color: "text-sky-600",
+    bg: "bg-sky-100",
+  },
+  {
+    key: "teachersWithCv",
+    label: "Teachers with CV",
+    description: "Submitted their profile and CV",
+    href: "/admin/teachers",
+    icon: GraduationCap,
+    color: "text-emerald-600",
+    bg: "bg-emerald-100",
+  },
+  {
+    key: "teachersVerified",
+    label: "Verified teachers",
+    description: "Approved — can apply for tuitions",
+    href: "/admin/teachers",
+    icon: ShieldCheck,
+    color: "text-teal-600",
+    bg: "bg-teal-100",
+  },
+  {
+    key: "teachersToReview",
+    label: "Teachers to review",
+    description: "Profiles waiting for your approval",
+    href: "/admin/teacher-requests",
+    icon: ClipboardCheck,
+    color: "text-amber-600",
+    bg: "bg-amber-100",
+  },
+  {
+    key: "parentRequestsToApprove",
+    label: "Parent requests to approve",
+    description: "Tuition requests not yet published",
+    href: "/admin/parent-requests",
+    icon: ClipboardList,
+    color: "text-rose-600",
+    bg: "bg-rose-100",
+  },
+  {
+    key: "bookingsToReview",
+    label: "Bookings to review",
+    description: "A teacher paid — accept or decline",
+    href: "/admin/parent-requests",
+    icon: UserCheck,
+    color: "text-orange-600",
+    bg: "bg-orange-100",
+  },
+  {
+    key: "tuitionsBooked",
+    label: "Tuitions booked",
+    description: "A teacher paid and you accepted the booking",
+    href: "/admin/payments",
+    icon: CreditCard,
+    color: "text-indigo-600",
+    bg: "bg-indigo-100",
+  },
+  {
+    key: "feesEarned",
+    label: "Platform fees earned",
+    description: "Fees collected from booked tuitions",
+    href: "/admin/payments",
+    icon: DollarSign,
+    color: "text-emerald-600",
+    bg: "bg-emerald-100",
+    format: formatRupees,
+  },
+];
+
+const EMPTY_STATS: Record<StatKey, number> = {
+  parents: 0,
+  teachersSignedUp: 0,
+  teachersWithCv: 0,
+  teachersVerified: 0,
+  teachersToReview: 0,
+  parentRequestsToApprove: 0,
+  bookingsToReview: 0,
+  tuitionsBooked: 0,
+  feesEarned: 0,
+};
 
 interface ActivityDay {
   date: string;
@@ -73,57 +189,8 @@ export default function AdminDashboard() {
     revenue: 0,
   });
   const [activityDays, setActivityDays] = useState<ActivityDay[]>([]);
-  const [stats, setStats] = useState<Stat[]>([
-    {
-      label: "Total Parents",
-      value: 0,
-      icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-100",
-    },
-    {
-      label: "Total Teachers",
-      value: 0,
-      icon: GraduationCap,
-      color: "text-emerald-600",
-      bg: "bg-emerald-100",
-    },
-    {
-      label: "Verified Teachers",
-      value: 0,
-      icon: ShieldCheck,
-      color: "text-teal-600",
-      bg: "bg-teal-100",
-    },
-    {
-      label: "Pending Teacher Reqs",
-      value: 0,
-      icon: ClipboardCheck,
-      color: "text-amber-600",
-      bg: "bg-amber-100",
-    },
-    {
-      label: "Pending Parent Reqs",
-      value: 0,
-      icon: ClipboardList,
-      color: "text-rose-600",
-      bg: "bg-rose-100",
-    },
-    {
-      label: "Fulfilled Requests",
-      value: 0,
-      icon: CreditCard,
-      color: "text-indigo-600",
-      bg: "bg-indigo-100",
-    },
-    {
-      label: "Total Revenue",
-      value: 0,
-      icon: DollarSign,
-      color: "text-emerald-600",
-      bg: "bg-emerald-100",
-    },
-  ]);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [teachersWithoutCv, setTeachersWithoutCv] = useState(0);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -199,57 +266,19 @@ export default function AdminDashboard() {
         };
       });
       setActivityDays(activity);
-      setStats([
-        {
-          label: "Total Parents",
-          value: parentsRes.data.data?.length || 0,
-          icon: Users,
-          color: "text-blue-600",
-          bg: "bg-blue-100",
-        },
-        {
-          label: "Total Teachers",
-          value: teachersRes.data.registeredCount ?? teachersRes.data.data?.length ?? 0,
-          icon: GraduationCap,
-          color: "text-emerald-600",
-          bg: "bg-emerald-100",
-        },
-        {
-          label: "Verified Teachers",
-          value: teachersRes.data.verifiedCount ?? 0,
-          icon: ShieldCheck,
-          color: "text-teal-600",
-          bg: "bg-teal-100",
-        },
-        {
-          label: "Pending Teacher Reqs",
-          value: pendingTeachers,
-          icon: ClipboardCheck,
-          color: "text-amber-600",
-          bg: "bg-amber-100",
-        },
-        {
-          label: "Pending Parent Reqs",
-          value: pendingParents,
-          icon: ClipboardList,
-          color: "text-rose-600",
-          bg: "bg-rose-100",
-        },
-        {
-          label: "Fulfilled Requests",
-          value: fulfilledReqs.length,
-          icon: CreditCard,
-          color: "text-indigo-600",
-          bg: "bg-indigo-100",
-        },
-        {
-          label: "Total Revenue",
-          value: totalRevenue,
-          icon: DollarSign,
-          color: "text-emerald-600",
-          bg: "bg-emerald-100",
-        },
-      ]);
+      setStats({
+        parents: parentsRes.data.data?.length || 0,
+        teachersSignedUp: teachersRes.data.accountCount ?? 0,
+        teachersWithCv:
+          teachersRes.data.registeredCount ?? teachersRes.data.data?.length ?? 0,
+        teachersVerified: teachersRes.data.verifiedCount ?? 0,
+        teachersToReview: pendingTeachers,
+        parentRequestsToApprove: pendingParents,
+        bookingsToReview: parentReqs.filter((r: any) => r.status === "under_review").length,
+        tuitionsBooked: fulfilledReqs.length,
+        feesEarned: totalRevenue,
+      });
+      setTeachersWithoutCv(teachersRes.data.withoutProfileCount ?? 0);
     } catch {
       toast.error("Failed to load dashboard stats");
     }
@@ -267,6 +296,7 @@ export default function AdminDashboard() {
     "teacher-profile:status-updated",
     "parent-request:status-updated",
     "parent-request:created",
+    "request:under-review",
   ]);
 
   if (!isAuthenticated) {
@@ -358,9 +388,18 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {stats.map((s) => (
-          <StatCard key={s.label} {...s} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {STAT_CARDS.map(({ key, format, ...card }) => (
+          <StatCard
+            key={key}
+            {...card}
+            value={format ? format(stats[key]) : stats[key]}
+            hint={
+              key === "teachersSignedUp" && teachersWithoutCv > 0
+                ? `${teachersWithoutCv} still ${teachersWithoutCv === 1 ? "needs" : "need"} to upload a CV`
+                : undefined
+            }
+          />
         ))}
       </div>
 

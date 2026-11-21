@@ -13,6 +13,8 @@ import {
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Modal } from "@/components/admin/Modal";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 const STATUS_TABS = [
   { key: "", label: "All" },
@@ -25,6 +27,7 @@ export default function ContactMessagesPage() {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
   const [active, setActive] = useState<ContactMessage | null>(null);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
@@ -92,6 +95,19 @@ export default function ContactMessagesPage() {
     }
   };
 
+  // `messages` is already narrowed by the server-side status filter.
+  const filtered = messages.filter((m) =>
+    matchesSearch(search, [
+      m.name,
+      m.email,
+      m.phone,
+      m.subject,
+      m.message,
+      m.reply,
+      m.status,
+    ]),
+  );
+
   return (
     <div>
       <PageHeader
@@ -99,6 +115,13 @@ export default function ContactMessagesPage() {
         subtitle="Messages submitted from the website contact form"
       />
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search name, email, phone, subject, message…"
+        shown={filtered.length}
+        total={messages.length}
+      />
       <div className="mb-5 flex gap-2 flex-wrap">
         {STATUS_TABS.map((tab) => (
           <button
@@ -209,8 +232,14 @@ export default function ContactMessagesPage() {
 
       {loading ? (
         <Loading />
-      ) : messages.length === 0 ? (
-        <EmptyState message="No contact messages yet" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          message={
+            search.trim()
+              ? `No ${statusFilter ? `${statusFilter} ` : ""}messages match "${search.trim()}"`
+              : "No contact messages yet"
+          }
+        />
       ) : (
         <DataTable
           columns={[
@@ -275,7 +304,7 @@ export default function ContactMessagesPage() {
               ),
             },
           ]}
-          data={messages}
+          data={filtered}
         />
       )}
     </div>

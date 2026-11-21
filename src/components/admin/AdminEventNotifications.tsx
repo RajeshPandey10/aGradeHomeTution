@@ -1,78 +1,152 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSocket } from "@/lib/socket";
+import { unlockAudio } from "@/lib/alertSound";
+import { AdminAlert, presentAlert } from "@/lib/adminAlerts";
+import { parentService } from "@/services/parentService";
 
-type AdminEvent = "parent" | "teacher" | "fulfilled";
-
-const eventDetails: Record<AdminEvent, { title: string; message: string; frequency: number }> = {
-  parent: {
-    title: "New parent request",
-    message: "A new tuition request has arrived.",
-    frequency: 660,
-  },
-  teacher: {
-    title: "New teacher request",
-    message: "A teacher profile is ready for review.",
-    frequency: 880,
-  },
-  fulfilled: {
-    title: "Request fulfilled",
-    message: "A teacher has fulfilled a tuition request.",
-    frequency: 1046,
-  },
+type ParentRequestCreated = {
+  request?: { _id?: string; name?: string; location?: string };
+  requestId?: string;
+  /** Set when an admin entered the request from the panel. */
+  createdBy?: string;
 };
 
-function playNotificationSound(frequency: number) {
-  try {
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    const context = new AudioContextClass();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.frequency.value = frequency;
-    oscillator.type = "sine";
-    gain.gain.setValueAtTime(0.08, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.35);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.35);
-  } catch {
-    // Audio can be blocked until the admin has interacted with the page.
-  }
-}
+type TeacherProfileEvent = {
+  profile?: { _id?: string; name?: string; status?: string };
+};
 
-function notifyAdmin(type: AdminEvent) {
-  const detail = eventDetails[type];
-  playNotificationSound(detail.frequency);
-  toast.info(detail.title, { description: detail.message, duration: 6000 });
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    new Notification(detail.title, { body: detail.message });
-  }
-}
+type BookingUnderReview = { requestId?: string };
+
+type OnlineVerificationSubmitted = {
+  profileId?: string;
+  name?: string;
+  resubmitted?: boolean;
+};
+
+type PersonalNotification = {
+  id?: string;
+  type?: string;
+  title?: string;
+  body?: string;
+  tuitionRequest?: string | null;
+};
+
+const shortPlace = (location?: string) => (location || "").split(",")[0].trim();
 
 export default function AdminEventNotifications() {
-  const initialized = useRef(false);
+  const router = useRouter();
+  const navigate = useCallback((href: string) => router.push(href), [router]);
+  const show = useCallback(
+    (alert: AdminAlert) => void presentAlert(alert, { navigate }),
+    [navigate],
+  );
 
+  // Browsers block audio until the page has been interacted with; any click
+  // or keypress in the panel unlocks it for background alerts.
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => undefined);
-    }
-    initialized.current = true;
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock, { capture: true, passive: true });
+    window.addEventListener("keydown", unlock, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock, { capture: true });
+      window.removeEventListener("keydown", unlock, { capture: true });
+    };
   }, []);
 
   useSocket({
-    "parent-request:created": () => {
-      if (initialized.current) notifyAdmin("parent");
+    "parent-request:created": (payload: ParentRequestCreated = {}) => {
+      if (payload.createdBy) return; // an admin's own entry, not a new lead
+      const { request } = payload;
+      const place = shortPlace(request?.location);
+      show({
+        kind: "parent-request",
+        title: "New parent request",
+        body: request?.name
+          ? `${request.name}${place ? ` · ${place}` : ""} is waiting for approval.`
+          : "A new tuition request is waiting for approval.",
+        href: "/admin/parent-requests",
+        tag: `parent-request:${request?._id || payload.requestId || Date.now()}`,
+      });
     },
-    "teacher-profile:created": () => {
-      if (initialized.current) notifyAdmin("teacher");
+
+    "teacher-profile:created": ({ profile }: TeacherProfileEvent = {}) => {
+      show({
+        kind: "teacher-request",
+        title: "New teacher request",
+        body: profile?.name
+          ? `${profile.name} submitted a profile for verification.`
+          : "A teacher profile is ready for review.",
+        href: "/admin/teacher-requests",
+        tag: `teacher-request:${profile?._id || Date.now()}`,
+      });
     },
-    "request:fulfilled": () => {
-      if (initialized.current) notifyAdmin("fulfilled");
+
+    "online-verification:submitted": ({
+      profileId,
+      name,
+      resubmitted,
+    }: OnlineVerificationSubmitted = {}) => {
+      show({
+        kind: "teacher-request",
+        title: resubmitted ? "Online teaching form resubmitted" : "New online teaching form",
+        body: `${name || "A teacher"} wants to teach online tuitions and is waiting for review.`,
+        href: "/admin/online-verifications",
+        tag: `online-verification:${profileId || Date.now()}`,
+      });
+    },
+
+    // Fires on every profile edit; only resubmissions need a review.
+    "teacher-profile:updated": ({ profile }: TeacherProfileEvent = {}) => {
+      if (profile?.status !== "in_review") return;
+      show({
+        kind: "teacher-request",
+        title: "Teacher profile resubmitted",
+        body: profile.name
+          ? `${profile.name} updated their profile for review.`
+          : "A teacher updated their profile for review.",
+        href: "/admin/teacher-requests",
+        tag: `teacher-request:${profile._id || Date.now()}`,
+      });
+    },
+
+    // A teacher has paid; the booking waits for an admin to accept or
+    // decline it. (request:fulfilled now only follows an admin's own accept.)
+    "request:under-review": async ({ requestId }: BookingUnderReview = {}) => {
+      let body = "A teacher has paid for a tuition and is waiting for your review.";
+      if (requestId) {
+        try {
+          const { data } = await parentService.getRequestDetail(requestId);
+          const teacher = data.lockedBy?.name || "A teacher";
+          const place = shortPlace(data.location);
+          body = `${teacher} paid for ${data.name ? `"${data.name}"` : "a tuition request"}${place ? ` · ${place}` : ""}. Accept or decline the booking.`;
+        } catch {
+          // Keep the generic text.
+        }
+      }
+      show({
+        kind: "request-fulfilled",
+        title: "Booking to review",
+        body,
+        href: "/admin/parent-requests",
+        tag: `under-review:${requestId || Date.now()}`,
+      });
+    },
+
+    // Personal notifications for this admin. Only refund requests are meant
+    // for admins; anything else (e.g. "your request is live" on a request an
+    // admin entered) is already covered by the alerts above.
+    "notification:new": (payload: PersonalNotification = {}) => {
+      if (payload.type !== "refund_requested") return;
+      show({
+        kind: "refund-request",
+        title: payload.title || "Refund requested",
+        body: payload.body || "A teacher has requested a refund.",
+        href: "/admin/refunds",
+        tag: `refund:${payload.id || Date.now()}`,
+      });
     },
   });
 

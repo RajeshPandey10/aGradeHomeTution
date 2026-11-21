@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Mail, Phone, Calendar, ShieldCheck, User, Trash2, FileText, Eye, ExternalLink, ArrowLeft } from "lucide-react";
 import { getImageUrl } from "@/lib/image";
-import { teacherService, TeacherProfile } from "@/services/teacherService";
+import { teacherService, TeacherAccount, TeacherProfile } from "@/services/teacherService";
+import { SearchInput } from "@/components/admin/SearchInput";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import {
@@ -11,6 +12,7 @@ import {
   Loading,
   EmptyState,
   StatusBadge,
+  TeacherAvatar,
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Modal } from "@/components/admin/Modal";
@@ -21,22 +23,43 @@ export default function TeachersPage() {
   const [deleteTarget, setDeleteTarget] = useState<TeacherProfile | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [counts, setCounts] = useState({ registered: 0, verified: 0 });
+  const [view, setView] = useState<"profiles" | "no-profile">("profiles");
+
+  // "?view=no-profile" (the dashboard's "Teachers signed up" card) opens that
+  // tab. Read after mount: during in-app navigation the URL updates only then.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "no-profile") {
+      setView("no-profile");
+    }
+  }, []);
+  const [noProfile, setNoProfile] = useState<TeacherAccount[]>([]);
+  const [counts, setCounts] = useState({ registered: 0, verified: 0, accounts: 0, withoutProfile: 0 });
   const [selected, setSelected] = useState<TeacherProfile | null>(null);
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);
   const toast = useToast();
 
   const fetch = useCallback(async () => {
+    const term = search.trim() || undefined;
     try {
-      const res = await teacherService.getAll(search.trim() || undefined);
-      setTeachers(res.data);
-      setCounts({ registered: res.registeredCount, verified: res.verifiedCount });
+      // Counts always come from the profiles call, so both tabs show them.
+      const [res, withoutProfile] = await Promise.all([
+        teacherService.getAll(view === "profiles" ? term : undefined),
+        view === "no-profile" ? teacherService.getWithoutProfile(term) : null,
+      ]);
+      if (view === "profiles") setTeachers(res.data);
+      if (withoutProfile) setNoProfile(withoutProfile.data || []);
+      setCounts({
+        registered: res.registeredCount,
+        verified: res.verifiedCount,
+        accounts: res.accountCount,
+        withoutProfile: res.withoutProfileCount,
+      });
     } catch {
       toast.error("Failed to load teachers");
     } finally {
       setLoading(false);
     }
-  }, [toast, search]);
+  }, [toast, search, view]);
 
   useEffect(() => {
     const timer = setTimeout(fetch, 300);
@@ -62,21 +85,50 @@ export default function TeachersPage() {
     <div>
       <PageHeader title="Teachers" subtitle="All registered teachers" />
 
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search teachers by name"
-          className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-        <span className="text-sm text-slate-600">
-          Registered: <span className="font-semibold text-slate-900">{counts.registered}</span>
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+        <span>
+          Signed up: <span className="font-semibold text-slate-900">{counts.accounts}</span>
         </span>
-        <span className="text-sm text-slate-600">
+        <span>
+          With profile: <span className="font-semibold text-slate-900">{counts.registered}</span>
+        </span>
+        <span>
           Verified: <span className="font-semibold text-slate-900">{counts.verified}</span>
         </span>
       </div>
+
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {[
+          { value: "profiles" as const, label: `With profile (${counts.registered})` },
+          { value: "no-profile" as const, label: `Signed up, no profile (${counts.withoutProfile})` },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => {
+              setView(tab.value);
+              setLoading(true);
+            }}
+            className={`cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              view === tab.value
+                ? "bg-blue-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder={
+          view === "profiles"
+            ? "Search name, email, phone, address, qualification…"
+            : "Search name, email, phone…"
+        }
+        shown={view === "profiles" ? teachers.length : noProfile.length}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -100,11 +152,24 @@ export default function TeachersPage() {
       >
         {selected && !viewingDoc && (
           <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <StatusBadge status={selected.status} />
-              <span className="text-xs text-slate-400">
-                Registered {new Date(selected.createdAt).toLocaleDateString()}
-              </span>
+            <div className="flex items-center gap-3">
+              <TeacherAvatar
+                name={selected.name || selected.user?.name}
+                src={selected.profilePicture ? getImageUrl(selected.profilePicture) : null}
+                size={64}
+              />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={selected.status} />
+                  <span className="text-xs text-slate-400">
+                    Registered {new Date(selected.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 inline-flex items-center gap-1.5">
+                  Online teaching:{" "}
+                  <StatusBadge status={selected.onlineTeaching?.status || "not_submitted"} />
+                </p>
+              </div>
             </div>
             {[
               ["Name", selected.name || selected.user?.name],
@@ -156,8 +221,69 @@ export default function TeachersPage() {
 
       {loading ? (
         <Loading />
+      ) : view === "no-profile" ? (
+        noProfile.length === 0 ? (
+          <EmptyState
+            message={
+              search.trim()
+                ? `No teachers without a profile match "${search.trim()}"`
+                : "Every teacher who signed up has submitted a profile"
+            }
+          />
+        ) : (
+          <DataTable
+            columns={[
+              {
+                key: "name",
+                header: "Name",
+                render: (t) => <span className="font-medium text-slate-900">{t.name}</span>,
+              },
+              {
+                key: "email",
+                header: "Email",
+                render: (t) => (
+                  <a href={`mailto:${t.email}`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-600">
+                    <Mail size={14} />
+                    {t.email}
+                  </a>
+                ),
+              },
+              {
+                key: "phone",
+                header: "Phone",
+                render: (t) =>
+                  t.phoneNumber ? (
+                    <a href={`tel:${t.phoneNumber}`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-600">
+                      <Phone size={14} />
+                      {t.phoneNumber}
+                    </a>
+                  ) : (
+                    <span className="text-slate-400">Not provided</span>
+                  ),
+              },
+              {
+                key: "verified",
+                header: "Email verified",
+                render: (t) => <StatusBadge status={t.isVerified ? "verified" : "unverified"} />,
+              },
+              {
+                key: "signedUp",
+                header: "Signed up",
+                render: (t) => (
+                  <span className="inline-flex items-center gap-1.5 text-slate-500">
+                    <Calendar size={14} />
+                    {new Date(t.createdAt).toLocaleDateString()}
+                  </span>
+                ),
+              },
+            ]}
+            data={noProfile}
+          />
+        )
       ) : teachers.length === 0 ? (
-        <EmptyState message="No teachers found" />
+        <EmptyState
+          message={search.trim() ? `No teachers match "${search.trim()}"` : "No teachers found"}
+        />
       ) : (
         <DataTable
           columns={[
@@ -165,8 +291,15 @@ export default function TeachersPage() {
               key: "name",
               header: "Name",
               render: (t) => (
-                <span className="font-medium text-slate-900">
-                  {t.name || t.user?.name}
+                <span className="inline-flex items-center gap-2.5">
+                  <TeacherAvatar
+                    name={t.name || t.user?.name}
+                    src={t.profilePicture ? getImageUrl(t.profilePicture) : null}
+                    size={32}
+                  />
+                  <span className="font-medium text-slate-900">
+                    {t.name || t.user?.name}
+                  </span>
                 </span>
               ),
             },

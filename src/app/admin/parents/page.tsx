@@ -6,6 +6,8 @@ import { Mail, Phone, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 interface Parent {
   _id: string;
@@ -19,6 +21,7 @@ interface Parent {
 export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetch = useCallback(async () => {
@@ -34,11 +37,22 @@ export default function ParentsPage() {
 
   useEffect(() => { fetch(); }, [fetch]);
 
+  const filtered = parents.filter((p) => matchesSearch(search, [p.name, p.email, p.phoneNumber]));
+
   return (
     <div>
       <PageHeader title="Parents" subtitle="All registered parents" />
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search name, email, phone…"
+        shown={filtered.length}
+        total={parents.length}
+      />
 
-      {loading ? <Loading /> : parents.length === 0 ? <EmptyState message="No parents found" /> : (
+      {loading ? <Loading /> : filtered.length === 0 ? (
+        <EmptyState message={search.trim() ? `No parents match "${search.trim()}"` : "No parents found"} />
+      ) : (
         <DataTable
           columns={[
             { key: "name", header: "Name", render: (p) => <span className="font-medium text-slate-900">{p.name}</span> },
@@ -53,7 +67,7 @@ export default function ParentsPage() {
               <span className="inline-flex items-center gap-1.5 text-slate-500"><Calendar size={14} />{new Date(p.createdAt).toLocaleDateString()}</span>
             )},
           ]}
-          data={parents}
+          data={filtered}
         />
       )}
     </div>

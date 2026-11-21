@@ -23,9 +23,11 @@ import {
   Loading,
   EmptyState,
   StatusBadge,
+  TeacherAvatar,
 } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import PdfViewer from "@/components/admin/pdf-viewer";
+import { SearchInput } from "@/components/admin/SearchInput";
 
 const STATUS_TABS = [
   { label: "All", value: "" },
@@ -69,7 +71,11 @@ export default function TeacherRequestsPage() {
   useEffect(() => {
     setLoading(true);
   }, [statusFilter]);
-  useRealtimeRefresh(fetchData, ["teacher-profile:status-updated"]);
+  useRealtimeRefresh(fetchData, [
+    "teacher-profile:status-updated",
+    "teacher-profile:created",
+    "teacher-profile:updated",
+  ]);
 
   const handleApprove = useCallback(
     async (profileId: string, status = "verified") => {
@@ -132,12 +138,11 @@ export default function TeacherRequestsPage() {
         subtitle="Review and verify teacher profiles"
       />
 
-      <input
-        type="text"
+      <SearchInput
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by name"
-        className="w-full max-w-xs mb-4 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        onChange={setSearch}
+        placeholder="Search name, email, phone, address, qualification…"
+        shown={requests.length}
       />
 
       {/* Status Filter Tabs */}
@@ -169,13 +174,35 @@ export default function TeacherRequestsPage() {
       >
         {selected && !viewingDoc && (
           <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <StatusBadge status={selected.status} />
-              {selected.createdAt && (
-                <span className="text-slate-400 text-xs">
-                  Submitted {new Date(selected.createdAt).toLocaleDateString()}
-                </span>
+            <div className="flex items-center gap-3 mb-1">
+              {selected.profilePicture ? (
+                <button
+                  onClick={() => setViewingDoc(getImageUrl(selected.profilePicture))}
+                  title="View full photo"
+                  className="cursor-zoom-in rounded-full"
+                >
+                  <TeacherAvatar
+                    name={selected.name || selected.user?.name}
+                    src={getImageUrl(selected.profilePicture)}
+                    size={64}
+                  />
+                </button>
+              ) : (
+                <TeacherAvatar name={selected.name || selected.user?.name} size={64} />
               )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={selected.status} />
+                  {selected.createdAt && (
+                    <span className="text-slate-400 text-xs">
+                      Submitted {new Date(selected.createdAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                {!selected.profilePicture && (
+                  <p className="text-xs text-slate-400 italic">No profile photo</p>
+                )}
+              </div>
             </div>
 
             {[
@@ -453,9 +480,11 @@ export default function TeacherRequestsPage() {
       ) : requests.length === 0 ? (
         <EmptyState
           message={
-            statusFilter
-              ? `No ${statusFilter.replace(/_/g, " ")} requests`
-              : "No verification requests"
+            search.trim()
+              ? `No ${statusFilter ? `${statusFilter.replace(/_/g, " ")} ` : ""}requests match "${search.trim()}"`
+              : statusFilter
+                ? `No ${statusFilter.replace(/_/g, " ")} requests`
+                : "No verification requests"
           }
         />
       ) : (
@@ -465,8 +494,15 @@ export default function TeacherRequestsPage() {
               key: "name",
               header: "Name",
               render: (r) => (
-                <span className="font-medium text-slate-900">
-                  {r.name || r.user?.name}
+                <span className="inline-flex items-center gap-2.5">
+                  <TeacherAvatar
+                    name={r.name || r.user?.name}
+                    src={r.profilePicture ? getImageUrl(r.profilePicture) : null}
+                    size={32}
+                  />
+                  <span className="font-medium text-slate-900">
+                    {r.name || r.user?.name}
+                  </span>
                 </span>
               ),
             },

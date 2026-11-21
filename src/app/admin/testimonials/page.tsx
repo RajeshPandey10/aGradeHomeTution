@@ -12,6 +12,8 @@ import {
   StatusBadge,
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 type FormData = {
   name: string;
@@ -39,6 +41,7 @@ export default function TestimonialsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Testimonial | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetchData = useCallback(async () => {
@@ -137,6 +140,10 @@ export default function TestimonialsPage() {
       toast.error("Failed to update testimonial");
     }
   };
+
+  const filtered = items.filter((t) =>
+    matchesSearch(search, [t.name, t.role, t.quote]),
+  );
 
   return (
     <div>
@@ -297,10 +304,24 @@ export default function TestimonialsPage() {
         loading={deleting}
       />
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search name, role, quote…"
+        shown={filtered.length}
+        total={items.length}
+      />
+
       {loading ? (
         <Loading />
-      ) : items.length === 0 ? (
-        <EmptyState message="No testimonials yet" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          message={
+            search.trim()
+              ? `No testimonials match "${search.trim()}"`
+              : "No testimonials yet"
+          }
+        />
       ) : (
         <DataTable
           columns={[
@@ -370,7 +391,7 @@ export default function TestimonialsPage() {
               ),
             },
           ]}
-          data={items}
+          data={filtered}
         />
       )}
     </div>

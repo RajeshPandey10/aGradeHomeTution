@@ -25,6 +25,7 @@ import {
   UserSquare2,
   Quote,
   BarChart3,
+  MonitorPlay,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
@@ -44,6 +45,11 @@ const navItems = [
     href: "/admin/teacher-requests",
     label: "Teacher Requests",
     icon: ClipboardCheck,
+  },
+  {
+    href: "/admin/online-verifications",
+    label: "Online Verifications",
+    icon: MonitorPlay,
   },
   {
     href: "/admin/parent-requests",

@@ -7,7 +7,9 @@ import { fcmService } from "@/services/fcmService";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, Loading, EmptyState } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { SearchInput } from "@/components/admin/SearchInput";
 import api from "@/lib/axios";
+import { matchesSearch } from "@/lib/search";
 
 interface NotificationLog {
   _id: string;
@@ -30,6 +32,7 @@ export default function NotificationLogsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<NotificationLog | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetch = useCallback(async () => {
@@ -60,9 +63,13 @@ export default function NotificationLogsPage() {
     }
   }, [deleteTarget, fetch, toast]);
 
+  const filtered = logs.filter((n) => matchesSearch(search, [n.title, n.message, n.target]));
+
   return (
     <div>
       <PageHeader title="Notification Logs" subtitle="History of sent push notifications" />
+
+      <SearchInput value={search} onChange={setSearch} placeholder="Search title, message, target…" shown={filtered.length} total={logs.length} />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -75,7 +82,7 @@ export default function NotificationLogsPage() {
         loading={deleting}
       />
 
-      {loading ? <Loading /> : logs.length === 0 ? <EmptyState message="No notification logs found" /> : (
+      {loading ? <Loading /> : filtered.length === 0 ? <EmptyState message={search.trim() ? `No notifications match "${search.trim()}"` : "No notification logs found"} /> : (
         <DataTable
           columns={[
             { key: "title", header: "Notification", render: (n) => (
@@ -110,7 +117,7 @@ export default function NotificationLogsPage() {
               </div>
             )},
           ]}
-          data={logs}
+          data={filtered}
         />
       )}
     </div>

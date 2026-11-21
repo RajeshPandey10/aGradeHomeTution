@@ -17,10 +17,20 @@ import {
   Percent,
   AlertTriangle,
   LockKeyhole,
+  Plus,
+  XCircle,
+  UserCheck,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
+import CreateParentRequestModal from "@/components/admin/CreateParentRequestModal";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { parentService, ParentProfile } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
+import { getErrorMessage } from "@/services/api";
+import { getImageUrl } from "@/lib/image";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import {
   ActionButton,
@@ -79,14 +89,25 @@ export default function ParentRequestsPage() {
   const [refundTarget, setRefundTarget] = useState<ParentProfile | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
+  // A paid booking the admin is accepting or declining (status under_review)
+  const [reviewAction, setReviewAction] = useState<{
+    request: ParentProfile;
+    decision: "approve" | "decline";
+  } | null>(null);
+  const [declineNote, setDeclineNote] = useState("");
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
     try {
       const res = await parentService.getRequests();
+      // Needs-action first: bookings to review, then requests to publish
+      const priority = (status: string) =>
+        status === "under_review" ? 0 : status === "pending" ? 1 : 2;
       const sorted = (res.data || []).sort((a, b) => {
-        const aPrio = a.status === "pending" ? 0 : 1;
-        const bPrio = b.status === "pending" ? 0 : 1;
+        const aPrio = priority(a.status);
+        const bPrio = priority(b.status);
         if (aPrio !== bPrio) return aPrio - bPrio;
         return (
           new Date(b.createdAt || 0).getTime() -
@@ -109,6 +130,7 @@ export default function ParentRequestsPage() {
     "parent-request:created",
     "request:fulfilled",
     "request:available",
+    "request:under-review",
   ]);
 
   const handleView = useCallback(async (r: ParentProfile) => {
@@ -145,6 +167,38 @@ export default function ParentRequestsPage() {
     },
     [fetchAll, toast],
   );
+
+  const handleReviewDecision = useCallback(async () => {
+    if (!reviewAction) return;
+    const { request, decision } = reviewAction;
+    setProcessing(request._id);
+    try {
+      if (decision === "approve") {
+        await parentService.approveBooking(request._id);
+        toast.success(
+          `Booking accepted. ${request.lockedBy?.name || "The teacher"} can now see the parent's contact.`,
+        );
+      } else {
+        await parentService.declineBooking(request._id, declineNote.trim() || undefined);
+        toast.success("Booking declined. The request is vacant again and the teacher has been notified.");
+      }
+      setReviewAction(null);
+      setDeclineNote("");
+      setSelected(null);
+      fetchAll();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      // Someone else may have decided it already; show the current state.
+      fetchAll();
+    } finally {
+      setProcessing(null);
+    }
+  }, [reviewAction, declineNote, fetchAll, toast]);
+
+  const openReview = useCallback((request: ParentProfile, decision: "approve" | "decline") => {
+    setDeclineNote("");
+    setReviewAction({ request, decision });
+  }, []);
 
   const handleResendInvoice = useCallback(
     async (id: string) => {
@@ -266,15 +320,68 @@ export default function ParentRequestsPage() {
     }
   }, [deleteTarget, fetchAll, toast]);
 
-  const filtered = statusFilter
+  const reviewCount = requests.filter((r) => r.status === "under_review").length;
+  const byStatus = statusFilter
     ? requests.filter((r) => r.status === statusFilter)
     : requests;
+  const filtered = byStatus.filter((r) =>
+    matchesSearch(search, [
+      r.name,
+      r.phone,
+      r.location,
+      r.status,
+      r.duration,
+      r.tuitionType,
+      r.salary,
+      r.teacherGender,
+      r.subjects,
+      r.grade,
+      r.board,
+      r.specificBoard,
+      r.level,
+      r.medium,
+      r.requirements,
+      r.parent?.name,
+      r.parent?.email,
+      r.parent?.phoneNumber,
+      r.assignedTeacher?.name,
+      r.assignedTeacher?.email,
+      r.assignedTeacher?.phoneNumber,
+      r.teacherProfile?.name,
+      r.teacherProfile?.phone,
+      r.lockedBy?.name,
+      r.lockedBy?.email,
+      r.paymentSlip?.paymentRef,
+      r.payment?.couponCode,
+      r.refund?.requestedBy?.name,
+    ]),
+  );
 
   return (
     <div>
       <PageHeader
         title="Parent Requests"
-        subtitle="Review and approve tuition requests from parents"
+        subtitle="Review, approve or add tuition requests from parents"
+        action={
+          <ActionButtonSolid
+            icon={Plus}
+            label="New Request"
+            onClick={() => setCreating(true)}
+            color="blue"
+          />
+        }
+      />
+      <CreateParentRequestModal
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={fetchAll}
+      />
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search name, phone, location, parent, teacher, subject…"
+        shown={filtered.length}
+        total={byStatus.length}
       />
       <div className="flex gap-1.5 mb-5 flex-wrap">
         {[
@@ -282,6 +389,7 @@ export default function ParentRequestsPage() {
           { label: "Pending", value: "pending" },
           { label: "Vacant", value: "vacant" },
           { label: "Ongoing", value: "ongoing" },
+          { label: "Under Review", value: "under_review" },
           { label: "Fulfilled", value: "fulfilled" },
         ].map((tab) => (
           <button
@@ -294,6 +402,15 @@ export default function ParentRequestsPage() {
             }`}
           >
             {tab.label}
+            {tab.value === "under_review" && reviewCount > 0 && (
+              <span
+                className={`ml-1.5 inline-flex min-w-4.5 justify-center rounded-full px-1 text-[10px] font-semibold ${
+                  statusFilter === tab.value ? "bg-white text-blue-700" : "bg-orange-500 text-white"
+                }`}
+              >
+                {reviewCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -370,6 +487,52 @@ export default function ParentRequestsPage() {
                 </span>
               )}
             </div>
+
+            {selected.status === "under_review" && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <UserCheck size={18} className="text-orange-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-orange-900">Booking awaiting your review</p>
+                    <p className="text-orange-800 mt-0.5">
+                      <span className="font-medium">{selected.lockedBy?.name || "A teacher"}</span>{" "}
+                      paid
+                      {selected.paymentSlip?.paymentAmount
+                        ? ` Rs. ${selected.paymentSlip.paymentAmount}`
+                        : ""}
+                      {selected.paymentSlip?.paidAt
+                        ? ` on ${new Date(selected.paymentSlip.paidAt).toLocaleString()}`
+                        : ""}{" "}
+                      to book this tuition. Check their profile against the requirements below.
+                      Accepting shares the parent&apos;s contact with them; declining makes the
+                      request vacant again for other teachers.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <DetailRow label="Teacher" value={selected.lockedBy?.name} icon={User} />
+                  <DetailRow label="Email" value={selected.lockedBy?.email} />
+                  <DetailRow
+                    label="Phone"
+                    value={
+                      selected.lockedBy?.phoneNumber ||
+                      selected.teacherProfile?.phone ||
+                      "Not provided"
+                    }
+                  />
+                </div>
+                {selected.teacherProfile?.cv && (
+                  <a
+                    href={getImageUrl(selected.teacherProfile.cv)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm"
+                  >
+                    <FileText size={14} /> View CV <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+            )}
 
             <SectionHeader title="Tuition Details" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -465,7 +628,13 @@ export default function ParentRequestsPage() {
             )}
             {selected.teacherProfile && (
               <>
-                <SectionHeader title="Teacher Profile" />
+                <SectionHeader
+                  title={
+                    selected.status === "under_review"
+                      ? "Teacher Profile (awaiting review)"
+                      : "Teacher Profile"
+                  }
+                />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailRow
                     label="Name"
@@ -638,6 +807,24 @@ export default function ParentRequestsPage() {
                   color="emerald"
                 />
               )}
+              {selected.status === "under_review" && (
+                <>
+                  <ActionButtonSolid
+                    icon={XCircle}
+                    label="Decline Booking"
+                    onClick={() => openReview(selected, "decline")}
+                    disabled={processing === selected._id}
+                    color="red"
+                  />
+                  <ActionButtonSolid
+                    icon={UserCheck}
+                    label="Accept Booking"
+                    onClick={() => openReview(selected, "approve")}
+                    disabled={processing === selected._id}
+                    color="emerald"
+                  />
+                </>
+              )}
               {selected.status === "fulfilled" && (
                 <>
                   <ActionButtonSolid
@@ -720,6 +907,104 @@ export default function ParentRequestsPage() {
                 className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer"
               >
                 {processing ? "Refunding..." : "Refund"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={reviewAction?.decision === "approve"}
+        onClose={() => !processing && setReviewAction(null)}
+        onConfirm={handleReviewDecision}
+        title="Accept Booking"
+        message={`Accept ${reviewAction?.request.lockedBy?.name || "this teacher"} for "${reviewAction?.request.name || "this request"}"? The request will be marked fulfilled, the teacher will be able to see the parent's contact, and the parent will be told who their teacher is.`}
+        confirmLabel="Accept Booking"
+        confirmColor="emerald"
+        loading={!!reviewAction && processing === reviewAction.request._id}
+      />
+
+      {reviewAction?.decision === "decline" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/40"
+            onClick={() => !processing && setReviewAction(null)}
+          />
+          <div
+            className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">Decline Booking</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              <span className="font-medium text-slate-900">{reviewAction.request.name}</span>{" "}
+              will go back to <span className="font-medium">vacant</span> so other teachers can
+              apply.{" "}
+              <span className="font-medium text-slate-900">
+                {reviewAction.request.lockedBy?.name || "The teacher"}
+              </span>{" "}
+              won&apos;t see the parent&apos;s contact.
+            </p>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
+              {/* Mirrors announceBookingDeclined in the backend's
+                  src/services/bookingReviewService.js — keep in sync. */}
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                The teacher will be told
+              </p>
+              <p className="text-sm text-slate-700">
+                Thank you so much for your interest in this tuition, and for your patience while
+                our team reviewed your booking. We&apos;re truly sorry — after careful
+                consideration, we weren&apos;t able to confirm it this time, as some of this
+                vacancy&apos;s requirements weren&apos;t fully met. This is in no way a reflection
+                of your abilities as a teacher.{" "}
+                {reviewAction.request.paymentSlip?.paymentAmount
+                  ? `The Rs. ${reviewAction.request.paymentSlip.paymentAmount} you paid`
+                  : "Any payment you made"}{" "}
+                will be refunded to you in full, and our team will contact you shortly about it. New
+                tuitions are posted every day, and we would be glad to see you apply for the next
+                one that suits you.
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex gap-2 text-sm text-amber-800">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <span>
+                Declining doesn&apos;t send money back automatically. Refund
+                {reviewAction.request.paymentSlip?.paymentAmount
+                  ? ` Rs. ${reviewAction.request.paymentSlip.paymentAmount}`
+                  : ""}{" "}
+                to the teacher yourself
+                {reviewAction.request.paymentSlip?.paymentRef
+                  ? ` (payment ref ${reviewAction.request.paymentSlip.paymentRef})`
+                  : ""}
+                . The amount and reference stay in the Lock History and Audit Logs.
+              </span>
+            </div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Internal note <span className="text-slate-400 font-normal">(optional, never shown to the teacher)</span>
+            </label>
+            <textarea
+              value={declineNote}
+              onChange={(e) => setDeclineNote(e.target.value)}
+              placeholder="e.g. Parent asked for a female tutor; qualification below the required level"
+              rows={3}
+              maxLength={1000}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+              disabled={!!processing}
+              autoFocus
+            />
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setReviewAction(null)}
+                disabled={!!processing}
+                className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReviewDecision}
+                disabled={!!processing}
+                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer"
+              >
+                {processing ? "Declining..." : "Decline Booking"}
               </button>
             </div>
           </div>
@@ -1029,9 +1314,11 @@ export default function ParentRequestsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           message={
-            statusFilter
-              ? `No ${statusFilter} requests`
-              : "No parent requests found"
+            search.trim()
+              ? `No ${statusFilter ? `${statusFilter} ` : ""}requests match "${search.trim()}"`
+              : statusFilter
+                ? `No ${statusFilter} requests`
+                : "No parent requests found"
           }
         />
       ) : (
@@ -1097,6 +1384,10 @@ export default function ParentRequestsPage() {
                   <span className="text-emerald-600 text-xs font-medium">
                     {r.assignedTeacher.name}
                   </span>
+                ) : r.lockedBy && r.status === "under_review" ? (
+                  <span className="text-orange-600 text-xs font-medium">
+                    {r.lockedBy.name} (paid, awaiting review)
+                  </span>
                 ) : r.lockedBy ? (
                   <span className="text-purple-600 text-xs font-medium">
                     {r.lockedBy.name} (locked)
@@ -1140,6 +1431,15 @@ export default function ParentRequestsPage() {
                       onClick={() => handleApprove(r._id)}
                       disabled={processing === r._id}
                       color="emerald"
+                    />
+                  )}
+                  {r.status === "under_review" && (
+                    <ActionButton
+                      icon={UserCheck}
+                      label="Review"
+                      onClick={() => handleView(r)}
+                      disabled={processing === r._id}
+                      color="amber"
                     />
                   )}
                   {r.status === "fulfilled" && (

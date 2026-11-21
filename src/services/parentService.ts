@@ -47,13 +47,15 @@ export interface ParentProfile {
   user?: { name: string; email: string };
   parent?: { _id: string; name: string; email: string; phoneNumber?: string };
   assignedTeacher?: { _id: string; name: string; email: string; phoneNumber?: string };
-  lockedBy?: { _id: string; name: string; email: string };
+  /** The teacher holding the request: applying (ongoing), or paid and awaiting review (under_review). */
+  lockedBy?: { _id: string; name: string; email: string; phoneNumber?: string };
   platformFeePercent?: number;
   payment?: {
     grossAmount: number;
     total: number;
     payable: number;
     percentage: number;
+    couponCode?: string | null;
     couponType?: string | null;
     couponValue?: number;
   };
@@ -87,9 +89,47 @@ export interface ParentProfile {
   };
 }
 
+export interface ParentAccount {
+  _id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+}
+
+export interface CreateParentRequestPayload {
+  /** Registered parent to link the request to; omit for walk-in / phone requests. */
+  parentId?: string;
+  name: string;
+  phone: string;
+  location: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  duration: string;
+  tuitionType: string;
+  daysPerWeek: string;
+  numberOfDays?: number;
+  teacherGender: string;
+  numberOfStudents: string;
+  board: string[];
+  specificBoard: string[];
+  level: string[];
+  grade: string[];
+  subjects: string[];
+  medium: string[];
+  timeSlots: { start: string; end: string }[];
+  salary: string;
+  requirements?: string;
+}
+
 export const parentService = {
   getRequests: () =>
     handleRequest<ParentProfile[]>(() => api.get("/api/admin/parent-requests")),
+
+  create: (data: CreateParentRequestPayload) =>
+    handleRequest<ParentProfile>(() => api.post("/api/admin/parent-requests", data)),
+
+  getAccounts: () =>
+    handleRequest<ParentAccount[]>(() => api.get("/api/admin/parents")),
 
   getRequestDetail: (id: string) =>
     handleRequest<ParentProfile>(() => api.get(`/api/admin/parent-requests/${id}`)),
@@ -99,6 +139,14 @@ export const parentService = {
 
   approve: (profileId: string) =>
     handleRequest<ParentProfile>(() => api.post("/api/admin/parent-requests/approve", { profileId })),
+
+  /** Accept a teacher's paid booking (status under_review): the teacher gets the parent's contact. */
+  approveBooking: (id: string) =>
+    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/approve-booking`)),
+
+  /** Decline a teacher's paid booking: the request goes back to vacant. `note` is internal only. */
+  declineBooking: (id: string, note?: string) =>
+    handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/decline-booking`, { note })),
 
   resendInvoice: (id: string) =>
     handleRequest<ParentProfile>(() => api.post(`/api/admin/parent-requests/${id}/resend-invoice`)),

@@ -12,6 +12,8 @@ import {
   StatusBadge,
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 type FormData = {
   code: string;
@@ -39,6 +41,7 @@ export default function CouponsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Coupon | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetchData = useCallback(async () => {
@@ -148,6 +151,18 @@ export default function CouponsPage() {
     }
   };
 
+  const filtered = coupons.filter((c) =>
+    matchesSearch(search, [
+      c.code,
+      c.couponType,
+      c.couponValue,
+      c.couponType === "percentage" ? `${c.couponValue}%` : `Rs. ${c.couponValue}`,
+      // "deactivated" rather than "inactive" so searching "active" finds only active coupons
+      c.isActive ? "active" : "deactivated",
+      c.isActive ? "verified" : "rejected",
+    ]),
+  );
+
   return (
     <div>
       <PageHeader
@@ -163,6 +178,14 @@ export default function CouponsPage() {
           <Plus size={16} /> Create Coupon
         </button>
       </div>
+
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search code, type, value, status…"
+        shown={filtered.length}
+        total={coupons.length}
+      />
 
       {/* Create/Edit Form Modal */}
       {showForm && (
@@ -315,8 +338,14 @@ export default function CouponsPage() {
 
       {loading ? (
         <Loading />
-      ) : coupons.length === 0 ? (
-        <EmptyState message="No coupons created yet" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          message={
+            search.trim()
+              ? `No coupons match "${search.trim()}"`
+              : "No coupons created yet"
+          }
+        />
       ) : (
         <DataTable
           columns={[
@@ -395,7 +424,7 @@ export default function CouponsPage() {
               ),
             },
           ]}
-          data={coupons}
+          data={filtered}
         />
       )}
     </div>

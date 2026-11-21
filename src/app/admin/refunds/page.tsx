@@ -25,7 +25,9 @@ import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { ActionButton, ActionButtonSolid, Loading, EmptyState } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ImageLightbox, useLightbox } from "@/components/admin/ImageLightbox";
+import { SearchInput } from "@/components/admin/SearchInput";
 import { getImageUrl } from "@/lib/image";
+import { matchesSearch } from "@/lib/search";
 import api from "@/lib/axios";
 
 interface TeacherProfileSnapshot {
@@ -157,6 +159,7 @@ export default function RefundsPage() {
   const [rejectedLogs, setRejectedLogs] = useState<RefundLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("pending");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ParentProfile | null>(null);
   const [selectedLog, setSelectedLog] = useState<RefundLog | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -187,9 +190,56 @@ export default function RefundsPage() {
   }, [toast]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-  useRealtimeRefresh(fetchAll, ["request:available", "request:fulfilled", "parent-request:status-updated", "parent-request:deleted"]);
+  useRealtimeRefresh(fetchAll, ["request:available", "request:fulfilled", "parent-request:status-updated", "parent-request:deleted", "notification:new"]);
 
   const pending = requests.filter((r) => r.refund?.requestedBy && !r.refund?.refundedBy);
+  const filteredPending = pending.filter((r) =>
+    matchesSearch(search, [
+      r.name,
+      r.phone,
+      r.location,
+      r.status,
+      r.parent?.name,
+      r.parent?.email,
+      r.parent?.phoneNumber,
+      r.assignedTeacher?.name,
+      r.assignedTeacher?.email,
+      r.assignedTeacher?.phoneNumber,
+      r.teacherProfile?.name,
+      r.teacherProfile?.phone,
+      r.refund?.requestedBy?.name,
+      r.refund?.requestedBy?.email,
+      r.refund?.reason,
+      r.refund?.reasons,
+      r.refund?.phoneNumber,
+      r.paymentSlip?.paymentRef,
+    ]),
+  );
+  const logMatchesSearch = (log: RefundLog) =>
+    matchesSearch(search, [
+      log.details?.tuition?.name,
+      log.details?.tuition?.location,
+      log.details?.parent?.name,
+      log.details?.parent?.email,
+      log.details?.parent?.phoneNumber,
+      log.details?.teacher?.name,
+      log.details?.teacher?.email,
+      log.details?.teacher?.phoneNumber,
+      log.details?.teacher?.profile?.name,
+      log.details?.teacher?.profile?.phone,
+      log.details?.originalRefundRequest?.reason,
+      log.details?.originalRefundRequest?.reasons,
+      log.details?.originalRefundRequest?.phoneNumber,
+      log.details?.adminReason,
+      log.details?.resolution,
+      log.details?.resolution === "delete" && "deleted",
+      log.details?.resolution === "keep" && "kept as is",
+      log.action === "refund_approved" ? "approved" : "rejected",
+      log.performedBy?.name,
+      log.performedBy?.email,
+    ]);
+  const filteredApproved = approvedLogs.filter(logMatchesSearch);
+  const filteredRejected = rejectedLogs.filter(logMatchesSearch);
 
   const handleView = useCallback(async (r: ParentProfile) => {
     try {
@@ -255,6 +305,13 @@ export default function RefundsPage() {
     <div>
       <PageHeader title="Refund Requests" subtitle="Review, approve, or reject refund requests submitted by teachers" />
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search tuition, teacher, parent, phone, reason…"
+        shown={tab === "pending" ? filteredPending.length : tab === "approved" ? filteredApproved.length : filteredRejected.length}
+        total={tab === "pending" ? pending.length : tab === "approved" ? approvedLogs.length : rejectedLogs.length}
+      />
       <div className="flex gap-1.5 mb-5 flex-wrap">
         {tabs.map((t) => (
           <button
@@ -576,7 +633,15 @@ export default function RefundsPage() {
       {loading ? (
         <Loading />
       ) : tab === "pending" ? (
-        pending.length === 0 ? <EmptyState message="No pending refund requests" /> : (
+        filteredPending.length === 0 ? (
+          <EmptyState
+            message={
+              search.trim()
+                ? `No pending refund requests match "${search.trim()}"`
+                : "No pending refund requests"
+            }
+          />
+        ) : (
           <DataTable
             columns={[
               { key: "name", header: "Tuition", render: (r) => (
@@ -611,11 +676,19 @@ export default function RefundsPage() {
                 </div>
               )},
             ]}
-            data={pending}
+            data={filteredPending}
           />
         )
       ) : tab === "approved" ? (
-        approvedLogs.length === 0 ? <EmptyState message="No approved refunds yet" /> : (
+        filteredApproved.length === 0 ? (
+          <EmptyState
+            message={
+              search.trim()
+                ? `No approved refunds match "${search.trim()}"`
+                : "No approved refunds yet"
+            }
+          />
+        ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <table className="w-full">
               <thead>
@@ -630,7 +703,7 @@ export default function RefundsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {approvedLogs.map((log) => (
+                {filteredApproved.map((log) => (
                   <tr key={log._id} className="hover:bg-slate-50/50">
                     <td className="px-5 py-3.5 text-sm">
                       <span className="font-medium text-slate-900">{log.details?.tuition?.name || "—"}</span>
@@ -657,7 +730,15 @@ export default function RefundsPage() {
           </div>
         )
       ) : (
-        rejectedLogs.length === 0 ? <EmptyState message="No rejected refund requests" /> : (
+        filteredRejected.length === 0 ? (
+          <EmptyState
+            message={
+              search.trim()
+                ? `No rejected refund requests match "${search.trim()}"`
+                : "No rejected refund requests"
+            }
+          />
+        ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <table className="w-full">
               <thead>
@@ -672,7 +753,7 @@ export default function RefundsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rejectedLogs.map((log) => (
+                {filteredRejected.map((log) => (
                   <tr key={log._id} className="hover:bg-slate-50/50">
                     <td className="px-5 py-3.5 text-sm">
                       <span className="font-medium text-slate-900">{log.details?.tuition?.name || "—"}</span>

@@ -24,6 +24,8 @@ import {
   StatusBadge,
 } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
+import { SearchInput } from "@/components/admin/SearchInput";
+import { matchesSearch } from "@/lib/search";
 
 function DetailRow({
   label,
@@ -64,13 +66,15 @@ export default function PaymentsPage() {
   const [refundTarget, setRefundTarget] = useState<ParentProfile | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [search, setSearch] = useState("");
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
     try {
       const res = await parentService.getRequests();
       const paymentRequests = (res.data || [])
-        .filter((r) => r.status === "fulfilled" || r.refund?.reason)
+        // Bookings under review are paid too; they count as revenue once accepted
+        .filter((r) => r.status === "fulfilled" || r.status === "under_review" || r.refund?.reason)
         .sort((a, b) => {
           const aDate = a.paymentSlip?.paidAt || a.createdAt || "";
           const bDate = b.paymentSlip?.paidAt || b.createdAt || "";
@@ -87,7 +91,7 @@ export default function PaymentsPage() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-  useRealtimeRefresh(fetchAll, ["request:fulfilled", "request:available"]);
+  useRealtimeRefresh(fetchAll, ["request:fulfilled", "request:available", "request:under-review"]);
 
   const handleView = useCallback(async (r: ParentProfile) => {
     try {
@@ -150,6 +154,30 @@ export default function PaymentsPage() {
     (r) => r.status === "fulfilled",
   ).length;
   const dateRefunded = dateRequests.filter((r) => r.refund?.reason).length;
+  // Search narrows the table only; the summary cards above stay on the date filter.
+  const filtered = dateRequests.filter((r) =>
+    matchesSearch(search, [
+      r.name,
+      r.location,
+      r.status,
+      r.refund?.reason && "refunded",
+      r.parent?.name,
+      r.parent?.email,
+      r.parent?.phoneNumber,
+      r.assignedTeacher?.name,
+      r.assignedTeacher?.email,
+      r.assignedTeacher?.phoneNumber,
+      r.teacherProfile?.name,
+      r.teacherProfile?.phone,
+      r.paymentSlip?.paymentRef,
+      r.paymentSlip?.medium,
+      r.paymentSlip?.paymentAmount,
+      r.payment?.couponCode,
+      r.payment?.grossAmount,
+      r.payment?.payable,
+      r.payment?.total,
+    ]),
+  );
 
   return (
     <div>
@@ -505,10 +533,24 @@ export default function PaymentsPage() {
         </div>
       )}
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Search tuition, teacher, parent, phone, payment ref…"
+        shown={filtered.length}
+        total={dateRequests.length}
+      />
+
       {loading ? (
         <Loading />
-      ) : dateRequests.length === 0 ? (
-        <EmptyState message="No payment transactions for this date" />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          message={
+            search.trim()
+              ? `No payment transactions ${selectedDate ? "for this date " : ""}match "${search.trim()}"`
+              : "No payment transactions for this date"
+          }
+        />
       ) : (
         <DataTable
           columns={[
@@ -642,7 +684,7 @@ export default function PaymentsPage() {
               ),
             },
           ]}
-          data={dateRequests}
+          data={filtered}
         />
       )}
     </div>

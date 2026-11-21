@@ -2,6 +2,7 @@
 
 import { Menu } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import NotificationSettings from "@/components/admin/NotificationSettings";
 
 export default function Navbar() {
   const { user, setSidebarOpen } = useAuthStore();
@@ -19,6 +20,7 @@ export default function Navbar() {
       <div className="flex-1" />
 
       <div className="flex items-center gap-3">
+        <NotificationSettings />
         <div className="text-right">
           <p className="text-sm font-medium text-slate-900">{user?.name}</p>
           <p className="text-xs text-slate-500 capitalize">{user?.role}</p>

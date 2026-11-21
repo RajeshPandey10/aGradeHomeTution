@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { memo } from "react";
 import { ChevronRight } from "lucide-react";
 
@@ -65,25 +66,42 @@ export const StatCard = memo(function StatCard({
   icon: Icon,
   color,
   bg,
+  description,
+  hint,
+  href,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
   bg: string;
+  /** Plain-words explanation of what the number counts. */
+  description?: string;
+  /** Something that needs attention, shown highlighted under the description. */
+  hint?: string;
+  /** Makes the whole card a link to the page behind the number. */
+  href?: string;
 }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-        </div>
-        <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center`}>
-          <Icon size={22} className={color} />
-        </div>
+  const body = (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</p>
+        <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+        {description && <p className="mt-1 text-xs text-slate-500">{description}</p>}
+        {hint && <p className="mt-1 text-xs font-medium text-amber-700">{hint}</p>}
+      </div>
+      <div className={`w-11 h-11 shrink-0 rounded-xl ${bg} flex items-center justify-center`}>
+        <Icon size={22} className={color} />
       </div>
     </div>
+  );
+  const cardClass = "block h-full bg-white rounded-xl border border-slate-200 p-5 transition-shadow";
+  return href ? (
+    <Link href={href} className={`${cardClass} hover:border-slate-300 hover:shadow-sm`}>
+      {body}
+    </Link>
+  ) : (
+    <div className={`${cardClass} hover:shadow-sm`}>{body}</div>
   );
 });
 
