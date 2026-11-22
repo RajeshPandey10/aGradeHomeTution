@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import type { ContactStatus } from "@/lib/enums";
 import { handleRequest } from "./api";
 
 export interface ContactMessage {
@@ -8,7 +9,7 @@ export interface ContactMessage {
   phone?: string;
   subject: string;
   message: string;
-  status: "new" | "read" | "replied";
+  status: ContactStatus;
   reply?: string;
   repliedAt?: string | null;
   source?: string;
@@ -16,7 +17,7 @@ export interface ContactMessage {
 }
 
 export const contactService = {
-  getAll: (status?: string) =>
+  getAll: (status?: ContactStatus) =>
     handleRequest<ContactMessage[]>(() =>
       api.get("/api/admin/contact-messages", { params: status ? { status } : undefined })
     ),

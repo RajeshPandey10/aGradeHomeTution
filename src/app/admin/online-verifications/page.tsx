@@ -12,11 +12,8 @@ import {
   PenTool,
 } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
-import {
-  teacherService,
-  TeacherProfile,
-  onlineClassLabel,
-} from "@/services/teacherService";
+import { teacherService, TeacherProfile } from "@/services/teacherService";
+import { labelFor, optionsFor, type OnlineTeachingStatus } from "@/lib/enums";
 import { useToast } from "@/hooks/useToast";
 import { getErrorMessage } from "@/services/api";
 import { getImageUrl } from "@/lib/image";
@@ -32,12 +29,11 @@ import {
 import { Modal } from "@/components/admin/Modal";
 import { SearchInput } from "@/components/admin/SearchInput";
 
+// Only submitted forms are listed, so there's no "Not submitted" tab.
 const STATUS_TABS = [
-  { label: "All", value: "" },
-  { label: "In Review", value: "in_review" },
-  { label: "Verified", value: "verified" },
-  { label: "Rejected", value: "rejected" },
-] as const;
+  { label: "All", value: "" } as const,
+  ...optionsFor("onlineTeachingStatus").filter((s) => s.value !== "not_submitted"),
+];
 
 const REASON_MAX = 500;
 
@@ -60,7 +56,7 @@ function ClassChips({ profile }: { profile: TeacherProfile }) {
           key={key}
           className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
         >
-          {onlineClassLabel(key)}
+          {labelFor("onlineClassLevel", key)}
           {key === "entrance_preparation" && ot?.entrancePreparation ? `: ${ot.entrancePreparation}` : ""}
           {key === "others" && ot?.otherClasses ? `: ${ot.otherClasses}` : ""}
         </span>
@@ -77,7 +73,7 @@ export default function OnlineVerificationsPage() {
   const [rejectTarget, setRejectTarget] = useState<TeacherProfile | null>(null);
   const [reason, setReason] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<OnlineTeachingStatus | "">("");
   const [search, setSearch] = useState("");
   const toast = useToast();
 
@@ -89,8 +85,8 @@ export default function OnlineVerificationsPage() {
       );
       setProfiles(res.data);
       setInReviewCount(res.inReviewCount);
-    } catch {
-      toast.error("Failed to load online verifications");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load online verifications"));
     } finally {
       setLoading(false);
     }
@@ -199,7 +195,7 @@ export default function OnlineVerificationsPage() {
                   {selected.phone || selected.user?.phoneNumber || "No phone"}
                 </p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <StatusBadge status={selected.onlineTeaching?.status || "not_submitted"} />
+                  <StatusBadge status={selected.onlineTeaching?.status || "not_submitted"} kind="onlineTeachingStatus" />
                   <span className="text-xs text-slate-400">
                     Profile: {selected.status.replace(/_/g, " ")}
                   </span>
@@ -383,9 +379,9 @@ export default function OnlineVerificationsPage() {
               render: (p) => (
                 <span
                   className="text-slate-500 max-w-60 inline-block truncate"
-                  title={(p.onlineTeaching?.classLevels || []).map(onlineClassLabel).join(", ")}
+                  title={(p.onlineTeaching?.classLevels || []).map((key) => labelFor("onlineClassLevel", key)).join(", ")}
                 >
-                  {(p.onlineTeaching?.classLevels || []).map(onlineClassLabel).join(", ") || "—"}
+                  {(p.onlineTeaching?.classLevels || []).map((key) => labelFor("onlineClassLevel", key)).join(", ") || "—"}
                 </span>
               ),
             },
@@ -405,7 +401,7 @@ export default function OnlineVerificationsPage() {
               header: "Status",
               render: (p) => (
                 <div>
-                  <StatusBadge status={p.onlineTeaching?.status || "not_submitted"} />
+                  <StatusBadge status={p.onlineTeaching?.status || "not_submitted"} kind="onlineTeachingStatus" />
                   {p.onlineTeaching?.status === "rejected" && p.onlineTeaching.rejectionReason && (
                     <p className="text-red-500 text-xs mt-0.5 max-w-40 truncate" title={p.onlineTeaching.rejectionReason}>
                       {p.onlineTeaching.rejectionReason}

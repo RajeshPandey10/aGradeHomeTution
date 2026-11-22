@@ -6,6 +6,7 @@ import { siteStatsService, SiteStats } from "@/services/siteStatsService";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader } from "@/components/admin/DataTable";
 import { ActionButtonSolid, Loading } from "@/components/admin/UI";
+import { getErrorMessage } from "@/lib/errors";
 
 type FormData = {
   verifiedTutors: string;
@@ -42,8 +43,8 @@ export default function SiteStatsPage() {
         studentsMatched: String(s.studentsMatched),
         districtsCovered: String(s.districtsCovered),
       });
-    } catch {
-      toast.error("Failed to load homepage stats");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load homepage stats"));
     } finally {
       setLoading(false);
     }
@@ -66,8 +67,8 @@ export default function SiteStatsPage() {
       await siteStatsService.update(values);
       toast.success("Homepage stats updated");
       fetchData();
-    } catch {
-      toast.error("Failed to update homepage stats");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update homepage stats"));
     } finally {
       setSaving(false);
     }

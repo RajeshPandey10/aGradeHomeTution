@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, type SessionTokens, type User } from "@/store/authStore";
 import api from "@/lib/axios";
+import { getErrorMessage } from "@/lib/errors";
 import { Shield, ArrowLeft, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
+
+// verify-otp sends the user as `{ id, ... }`; the store keeps /api/auth/me's `_id`.
+interface VerifyOtpData extends SessionTokens {
+  user: Omit<User, "_id"> & { _id?: string; id?: string };
+}
 
 export default function VerifyOTPPage() {
   const router = useRouter();
@@ -14,7 +20,7 @@ export default function VerifyOTPPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const { login: storeLogin } = useAuthStore();
+  const { setSession } = useAuthStore();
   const toast = useToast();
 
   useEffect(() => {
@@ -50,15 +56,20 @@ export default function VerifyOTPPage() {
 
     setLoading(true);
     try {
-      const res = await api.post("/api/admin/verify-otp", { email, otp: code });
-      const { user, accessToken, refreshToken } = res.data.data;
-      localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-      storeLogin(email, "");
+      const res = await api.post<{ data: VerifyOtpData }>(
+        "/api/admin/verify-otp",
+        { email, otp: code },
+      );
+      const {
+        user: { id, _id, ...user },
+        accessToken,
+        refreshToken,
+      } = res.data.data;
+      setSession({ ...user, _id: _id ?? id ?? "" }, { accessToken, refreshToken });
       toast.success("Login successful");
-      window.location.href = "/admin";
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Invalid OTP");
+      router.replace("/admin");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Invalid OTP"));
     } finally {
       setLoading(false);
     }
@@ -70,8 +81,8 @@ export default function VerifyOTPPage() {
       await api.post("/api/admin/resend-otp", { email });
       setOtp(["", "", "", "", "", ""]);
       toast.success("New OTP sent to your email");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to resend OTP");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to resend OTP"));
     } finally {
       setResending(false);
     }

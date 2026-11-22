@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { isAxiosError } from "axios";
 import api from "@/lib/axios";
 import {
   Users,
@@ -18,6 +19,9 @@ import { useAuthStore } from "@/store/authStore";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { useToast } from "@/hooks/useToast";
 import { StatCard, PageHeader } from "@/components/admin/DataTable";
+import type { ParentAccount, ParentProfile } from "@/services/parentService";
+import type { TeacherProfile } from "@/services/teacherService";
+import { getErrorMessage } from "@/lib/errors";
 
 type StatKey =
   | "parents"
@@ -141,6 +145,24 @@ const EMPTY_STATS: Record<StatKey, number> = {
   feesEarned: 0,
 };
 
+// Reflects whether this page's own stats requests just succeeded.
+type ApiStatus = "checking" | "online" | "error" | "unreachable";
+
+const API_STATUS: Record<ApiStatus, { label: string; color: string }> = {
+  checking: { label: "Checking...", color: "text-slate-500" },
+  online: { label: "Online", color: "text-emerald-600" },
+  error: { label: "Responding with errors", color: "text-amber-600" },
+  unreachable: { label: "Unreachable", color: "text-red-600" },
+};
+
+interface TeachersResponse {
+  data: TeacherProfile[];
+  accountCount?: number;
+  registeredCount?: number;
+  verifiedCount?: number;
+  withoutProfileCount?: number;
+}
+
 interface ActivityDay {
   date: string;
   parentRequests: number;
@@ -191,43 +213,44 @@ export default function AdminDashboard() {
   const [activityDays, setActivityDays] = useState<ActivityDay[]>([]);
   const [stats, setStats] = useState(EMPTY_STATS);
   const [teachersWithoutCv, setTeachersWithoutCv] = useState(0);
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
 
   const fetchStats = useCallback(async () => {
     try {
       const [parentsRes, teachersRes, teacherReqsRes, parentReqsRes] =
         await Promise.all([
-          api.get("/api/admin/parents"),
-          api.get("/api/admin/teachers"),
-          api.get("/api/admin/teacher-requests"),
-          api.get("/api/admin/parent-requests"),
+          api.get<{ data: ParentAccount[] }>("/api/admin/parents"),
+          api.get<TeachersResponse>("/api/admin/teachers"),
+          api.get<{ data: TeacherProfile[] }>("/api/admin/teacher-requests"),
+          api.get<{ data: ParentProfile[] }>("/api/admin/parent-requests"),
         ]);
 
       const pendingTeachers =
-        teacherReqsRes.data.data?.filter((t: any) => t.status === "in_review")
+        teacherReqsRes.data.data?.filter((t) => t.status === "in_review")
           .length || 0;
       const pendingParents =
-        parentReqsRes.data.data?.filter((t: any) => t.status === "pending")
+        parentReqsRes.data.data?.filter((t) => t.status === "pending")
           .length || 0;
       const parentReqs = parentReqsRes.data.data || [];
       const fulfilledReqs = parentReqs.filter(
-        (r: any) => r.status === "fulfilled",
+        (r) => r.status === "fulfilled",
       );
       const totalRevenue = fulfilledReqs.reduce(
-        (sum: number, r: any) => sum + (r.payment?.payable || 0),
+        (sum, r) => sum + (r.payment?.payable || 0),
         0,
       );
       const isInRange = (value: string | undefined) => {
         const date = dateKey(value);
         return date >= fromDate && date <= toDate;
       };
-      const periodRequests = parentReqs.filter((r: any) =>
+      const periodRequests = parentReqs.filter((r) =>
         isInRange(r.createdAt),
       );
       const dayTeacherRequests = (teacherReqsRes.data.data || []).filter(
-        (t: any) => isInRange(t.createdAt),
+        (t) => isInRange(t.createdAt),
       );
       const periodFulfilled = parentReqs.filter(
-        (r: any) =>
+        (r) =>
           r.status === "fulfilled" &&
           isInRange(r.paymentSlip?.paidAt || r.createdAt),
       );
@@ -236,20 +259,20 @@ export default function AdminDashboard() {
         teacherRequests: dayTeacherRequests.length,
         fulfilled: periodFulfilled.length,
         revenue: periodFulfilled.reduce(
-          (sum: number, r: any) => sum + (r.payment?.payable || 0),
+          (sum, r) => sum + (r.payment?.payable || 0),
           0,
         ),
       });
 
       const activity = getDateRange(fromDate, toDate).map((date) => {
         const parentRequests = parentReqs.filter(
-          (request: any) => dateKey(request.createdAt) === date,
+          (request) => dateKey(request.createdAt) === date,
         ).length;
         const teacherRequests = (teacherReqsRes.data.data || []).filter(
-          (request: any) => dateKey(request.createdAt) === date,
+          (request) => dateKey(request.createdAt) === date,
         ).length;
         const payments = parentReqs.filter(
-          (request: any) =>
+          (request) =>
             request.status === "fulfilled" &&
             dateKey(request.paymentSlip?.paidAt || request.createdAt) === date,
         );
@@ -259,7 +282,7 @@ export default function AdminDashboard() {
           teacherRequests,
           payments: payments.length,
           revenue: payments.reduce(
-            (sum: number, request: any) =>
+            (sum, request) =>
               sum + (request.payment?.payable || 0),
             0,
           ),
@@ -274,13 +297,17 @@ export default function AdminDashboard() {
         teachersVerified: teachersRes.data.verifiedCount ?? 0,
         teachersToReview: pendingTeachers,
         parentRequestsToApprove: pendingParents,
-        bookingsToReview: parentReqs.filter((r: any) => r.status === "under_review").length,
+        bookingsToReview: parentReqs.filter((r) => r.status === "under_review").length,
         tuitionsBooked: fulfilledReqs.length,
         feesEarned: totalRevenue,
       });
       setTeachersWithoutCv(teachersRes.data.withoutProfileCount ?? 0);
-    } catch {
-      toast.error("Failed to load dashboard stats");
+      setApiStatus("online");
+    } catch (err) {
+      // Only a failed request says anything about the API itself.
+      if (isAxiosError(err)) setApiStatus(err.response ? "error" : "unreachable");
+      else setApiStatus("online");
+      toast.error(getErrorMessage(err, "Failed to load dashboard stats"));
     }
   }, [fromDate, toDate, toast]);
 
@@ -555,8 +582,8 @@ export default function AdminDashboard() {
             {[
               {
                 label: "API Status",
-                value: "Online",
-                color: "text-emerald-600",
+                value: API_STATUS[apiStatus].label,
+                color: API_STATUS[apiStatus].color,
               },
               {
                 label: "Environment",

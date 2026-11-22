@@ -4,6 +4,16 @@ import { useState, useCallback } from "react";
 import { Send, Bell, Users, User, Globe } from "lucide-react";
 import { fcmService, FcmResult, FcmBatchResult } from "@/services/fcmService";
 import { useToast } from "@/hooks/useToast";
+import { getErrorMessage } from "@/lib/errors";
+import { optionsFor } from "@/lib/enums";
+
+// Push targets: every device, or every teacher / parent.
+const AUDIENCES = [
+  { value: "", label: "All Devices", icon: Globe },
+  ...optionsFor("userRole")
+    .filter((r) => r.value !== "admin")
+    .map((r) => ({ value: r.value, label: `${r.label}s`, icon: Users })),
+];
 import { PageHeader } from "@/components/admin/DataTable";
 import { ActionButtonSolid } from "@/components/admin/UI";
 
@@ -22,10 +32,12 @@ export default function NotificationsPage() {
     setSending(true);
     setResult(null);
     try {
-      const payload: Record<string, unknown> = { title, body };
-      if (role) payload.role = role;
-      if (user_id) payload.user_id = user_id;
-      const res = await fcmService.send(payload as any);
+      const res = await fcmService.send({
+        title,
+        body,
+        ...(role ? { role } : {}),
+        ...(user_id ? { user_id } : {}),
+      });
       setResult(res);
       const totalSuccess = res.results?.reduce((sum, r) => sum + r.successCount, 0) ?? 0;
       if (totalSuccess > 0) {
@@ -33,9 +45,8 @@ export default function NotificationsPage() {
       } else {
         toast.error(res.message || "Failed to send notification");
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Failed to send notification";
-      toast.error(msg);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to send notification"));
     } finally {
       setSending(false);
     }
@@ -47,11 +58,7 @@ export default function NotificationsPage() {
 
       <div className="bg-white rounded-xl border border-slate-200 p-6 max-w-2xl">
         <div className="flex flex-wrap gap-2 mb-6">
-          {[
-            { value: "", label: "All Devices", icon: Globe },
-            { value: "teacher", label: "Teachers", icon: Users },
-            { value: "parent", label: "Parents", icon: Users },
-          ].map((opt) => (
+          {AUDIENCES.map((opt) => (
             <button
               key={opt.value}
               onClick={() => { setRole(opt.value); setUserId(""); }}

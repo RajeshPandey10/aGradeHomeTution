@@ -13,6 +13,7 @@ import {
   StatusBadge,
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { getErrorMessage } from "@/lib/errors";
 
 type FormData = {
   name: string;
@@ -54,8 +55,8 @@ export default function TeamPage() {
     try {
       const res = await teamService.getAll();
       setMembers(res.data);
-    } catch {
-      toast.error("Failed to load team members");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load team members"));
     } finally {
       setLoading(false);
     }
@@ -94,8 +95,8 @@ export default function TeamPage() {
     try {
       const res = await teamService.uploadPhoto(file);
       setForm((f) => ({ ...f, photoUrl: res.data.urls[0] }));
-    } catch {
-      toast.error("Failed to upload photo");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to upload photo"));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -133,9 +134,12 @@ export default function TeamPage() {
       setForm(emptyForm);
       setEditing(null);
       fetchData();
-    } catch {
+    } catch (err) {
       toast.error(
-        editing ? "Failed to update team member" : "Failed to add team member",
+        getErrorMessage(
+          err,
+          editing ? "Failed to update team member" : "Failed to add team member",
+        ),
       );
     } finally {
       setSaving(false);
@@ -150,8 +154,8 @@ export default function TeamPage() {
       toast.success("Team member removed");
       setDeleteTarget(null);
       fetchData();
-    } catch {
-      toast.error("Failed to remove team member");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to remove team member"));
     } finally {
       setDeleting(false);
     }
@@ -163,8 +167,8 @@ export default function TeamPage() {
         isPublished: !member.isPublished,
       });
       fetchData();
-    } catch {
-      toast.error("Failed to update team member");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update team member"));
     }
   };
 
@@ -445,6 +449,7 @@ export default function TeamPage() {
                 >
                   <StatusBadge
                     status={m.isPublished ? "verified" : "unverified"}
+                    label={m.isPublished ? "Published" : "Hidden"}
                   />
                 </button>
               ),

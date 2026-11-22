@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -21,8 +22,8 @@ export default function AdminLoginPage() {
       await api.post("/api/admin/login", { email, password });
       toast.success("OTP sent to your email");
       router.push(`/admin/verify-otp?email=${encodeURIComponent(email)}`);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Login failed");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Login failed"));
     } finally {
       setLoading(false);
     }

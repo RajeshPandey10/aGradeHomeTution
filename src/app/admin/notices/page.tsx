@@ -31,6 +31,9 @@ import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { fromLocalInput, toLocalInput } from "@/lib/datetime";
+import { getErrorMessage } from "@/lib/errors";
+import { labelFor, optionsFor, type NoticeTargetRole } from "@/lib/enums";
 
 export default function NoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -42,9 +45,7 @@ export default function NoticesPage() {
   const [description, setDescription] = useState("");
   const [showAsPopup, setShowAsPopup] = useState(false);
   const [popupExpiresAt, setPopupExpiresAt] = useState("");
-  const [targetRole, setTargetRole] = useState<"teacher" | "parent" | "both">(
-    "both",
-  );
+  const [targetRole, setTargetRole] = useState<NoticeTargetRole>("both");
   const [countdownTo, setCountdownTo] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaHref, setCtaHref] = useState("");
@@ -64,8 +65,8 @@ export default function NoticesPage() {
     try {
       const res = await noticeService.getAll();
       setNotices(res.data);
-    } catch {
-      toast.error("Failed to load notices");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load notices"));
     } finally {
       setLoading(false);
     }
@@ -99,15 +100,9 @@ export default function NoticesPage() {
     setSubtitle(n.subtitle || "");
     setDescription(n.description || "");
     setShowAsPopup(n.showAsPopup || false);
-    setPopupExpiresAt(
-      n.popupExpiresAt
-        ? new Date(n.popupExpiresAt).toISOString().slice(0, 16)
-        : "",
-    );
+    setPopupExpiresAt(toLocalInput(n.popupExpiresAt));
     setTargetRole(n.targetRole || "both");
-    setCountdownTo(
-      n.countdownTo ? new Date(n.countdownTo).toISOString().slice(0, 16) : "",
-    );
+    setCountdownTo(toLocalInput(n.countdownTo));
     setCtaLabel(n.ctaLabel || "");
     setCtaHref(n.ctaHref || "");
     setImageFiles([]);
@@ -162,12 +157,9 @@ export default function NoticesPage() {
           description,
           images: allImages,
           showAsPopup,
-          popupExpiresAt:
-            showAsPopup && popupExpiresAt
-              ? new Date(popupExpiresAt).toISOString()
-              : null,
+          popupExpiresAt: showAsPopup ? fromLocalInput(popupExpiresAt) : null,
           targetRole,
-          countdownTo: countdownTo ? new Date(countdownTo).toISOString() : null,
+          countdownTo: fromLocalInput(countdownTo),
           ctaLabel: ctaLabel || null,
           ctaHref: ctaHref || null,
         };
@@ -180,10 +172,13 @@ export default function NoticesPage() {
         }
         setModalOpen(false);
         fetch();
-      } catch {
+      } catch (err) {
         setUploading(false);
         toast.error(
-          editId ? "Failed to update notice" : "Failed to create notice",
+          getErrorMessage(
+            err,
+            editId ? "Failed to update notice" : "Failed to create notice",
+          ),
         );
       } finally {
         setSaving(false);
@@ -215,8 +210,8 @@ export default function NoticesPage() {
       toast.success("Notice deleted successfully");
       setDeleteTarget(null);
       fetch();
-    } catch {
-      toast.error("Failed to delete notice");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete notice"));
     } finally {
       setDeleting(false);
     }
@@ -308,14 +303,14 @@ export default function NoticesPage() {
             </label>
             <select
               value={targetRole}
-              onChange={(e) =>
-                setTargetRole(e.target.value as "teacher" | "parent" | "both")
-              }
+              onChange={(e) => setTargetRole(e.target.value as NoticeTargetRole)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
             >
-              <option value="both">All users (Teachers & Parents)</option>
-              <option value="teacher">Teachers only</option>
-              <option value="parent">Parents only</option>
+              {optionsFor("noticeTargetRole").map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
             <p className="text-xs text-slate-500 mt-1.5">
               Choose who can see this notice in the application.
@@ -580,11 +575,9 @@ export default function NoticesPage() {
               key: "targetRole",
               header: "Audience",
               render: (n) => (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 capitalize whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 whitespace-nowrap">
                   <Users size={11} />{" "}
-                  {n.targetRole === "both"
-                    ? "All users"
-                    : `${n.targetRole}s only`}
+                  {labelFor("noticeTargetRole", n.targetRole || "both")}
                 </span>
               ),
             },

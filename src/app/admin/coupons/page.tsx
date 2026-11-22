@@ -14,10 +14,13 @@ import {
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { fromLocalInput, toLocalInput } from "@/lib/datetime";
+import { getErrorMessage } from "@/lib/errors";
+import { optionsFor, type CouponType } from "@/lib/enums";
 
 type FormData = {
   code: string;
-  couponType: "percentage" | "flat";
+  couponType: CouponType;
   couponValue: string;
   maxUses: string;
   expiresAt: string;
@@ -48,8 +51,8 @@ export default function CouponsPage() {
     try {
       const res = await couponService.getAll();
       setCoupons(res.data);
-    } catch {
-      toast.error("Failed to load coupons");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load coupons"));
     } finally {
       setLoading(false);
     }
@@ -72,7 +75,7 @@ export default function CouponsPage() {
       couponType: coupon.couponType,
       couponValue: String(coupon.couponValue),
       maxUses: coupon.maxUses !== null ? String(coupon.maxUses) : "",
-      expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 16) : "",
+      expiresAt: toLocalInput(coupon.expiresAt),
     });
     setShowForm(true);
   };
@@ -95,7 +98,7 @@ export default function CouponsPage() {
           couponType: form.couponType,
           couponValue: value,
           maxUses: form.maxUses ? Number(form.maxUses) : null,
-          expiresAt: form.expiresAt || null,
+          expiresAt: fromLocalInput(form.expiresAt),
         });
         toast.success("Coupon updated");
       } else {
@@ -104,7 +107,7 @@ export default function CouponsPage() {
           couponType: form.couponType,
           couponValue: value,
           maxUses: form.maxUses ? Number(form.maxUses) : null,
-          expiresAt: form.expiresAt || null,
+          expiresAt: fromLocalInput(form.expiresAt),
         });
         toast.success("Coupon created");
       }
@@ -112,9 +115,12 @@ export default function CouponsPage() {
       setForm(emptyForm);
       setEditing(null);
       fetchData();
-    } catch {
+    } catch (err) {
       toast.error(
-        editing ? "Failed to update coupon" : "Failed to create coupon",
+        getErrorMessage(
+          err,
+          editing ? "Failed to update coupon" : "Failed to create coupon",
+        ),
       );
     } finally {
       setSaving(false);
@@ -129,8 +135,8 @@ export default function CouponsPage() {
       toast.success("Coupon deleted");
       setDeleteTarget(null);
       fetchData();
-    } catch {
-      toast.error("Failed to delete coupon");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete coupon"));
     } finally {
       setDeleting(false);
     }
@@ -144,8 +150,8 @@ export default function CouponsPage() {
         coupon.isActive ? "Coupon deactivated" : "Coupon activated",
       );
       fetchData();
-    } catch {
-      toast.error("Failed to update coupon");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update coupon"));
     } finally {
       setToggling(null);
     }
@@ -159,7 +165,6 @@ export default function CouponsPage() {
       c.couponType === "percentage" ? `${c.couponValue}%` : `Rs. ${c.couponValue}`,
       // "deactivated" rather than "inactive" so searching "active" finds only active coupons
       c.isActive ? "active" : "deactivated",
-      c.isActive ? "verified" : "rejected",
     ]),
   );
 
@@ -236,14 +241,17 @@ export default function CouponsPage() {
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        couponType: e.target.value as "percentage" | "flat",
+                        couponType: e.target.value as CouponType,
                       })
                     }
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={saving}
                   >
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="flat">Flat (Rs.)</option>
+                    {optionsFor("couponType").map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -399,7 +407,10 @@ export default function CouponsPage() {
                   disabled={toggling === c._id}
                   className="cursor-pointer"
                 >
-                  <StatusBadge status={c.isActive ? "verified" : "rejected"} />
+                  <StatusBadge
+                    status={c.isActive ? "verified" : "rejected"}
+                    label={c.isActive ? "Active" : "Deactivated"}
+                  />
                 </button>
               ),
             },

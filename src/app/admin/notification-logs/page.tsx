@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Bell, Target, Calendar, CheckCircle2, Circle, Trash2 } from "lucide-react";
+import { Bell, Target, Calendar, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { fcmService } from "@/services/fcmService";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
@@ -10,22 +10,31 @@ import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { SearchInput } from "@/components/admin/SearchInput";
 import api from "@/lib/axios";
 import { matchesSearch } from "@/lib/search";
+import { getErrorMessage } from "@/lib/errors";
 
+// One summary entry per broadcast the admins sent (not each recipient's copy).
 interface NotificationLog {
   _id: string;
-  recipient: string;
   sender: {
     _id: string;
     name: string;
     email: string;
-  };
+  } | null;
   title?: string;
   message: string;
   target?: string;
-  isRead: boolean;
   createdAt: string;
-  displayNo: number;
 }
+
+interface NotificationLogPage {
+  logs: NotificationLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 20;
 
 export default function NotificationLogsPage() {
   const [logs, setLogs] = useState<NotificationLog[]>([]);
@@ -33,18 +42,33 @@ export default function NotificationLogsPage() {
   const [deleteTarget, setDeleteTarget] = useState<NotificationLog | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const toast = useToast();
 
   const fetch = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await api.get("/api/public/notifications");
-      setLogs(res.data.data || []);
-    } catch {
-      toast.error("Failed to load notification logs");
+      const res = await api.get<{ data: NotificationLogPage }>(
+        "/api/admin/notification-logs",
+        { params: { page, limit: PAGE_SIZE } },
+      );
+      const data = res.data.data;
+      // Deleting the last entry on a page leaves it empty; step back one.
+      if (data.logs.length === 0 && page > 1) {
+        setPage(page - 1);
+        return;
+      }
+      setLogs(data.logs);
+      setTotal(data.total);
+      setTotalPages(Math.max(1, data.totalPages));
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load notification logs"));
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [page, toast]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -56,20 +80,25 @@ export default function NotificationLogsPage() {
       toast.success("Notification deleted");
       setDeleteTarget(null);
       fetch();
-    } catch {
-      toast.error("Failed to delete notification");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete notification"));
     } finally {
       setDeleting(false);
     }
   }, [deleteTarget, fetch, toast]);
 
-  const filtered = logs.filter((n) => matchesSearch(search, [n.title, n.message, n.target]));
+  const filtered = logs.filter((n) =>
+    matchesSearch(search, [n.title, n.message, n.target, n.sender?.name]),
+  );
 
   return (
     <div>
-      <PageHeader title="Notification Logs" subtitle="History of sent push notifications" />
+      <PageHeader
+        title="Notification Logs"
+        subtitle={`History of sent push notifications · ${total} total`}
+      />
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Search title, message, target…" shown={filtered.length} total={logs.length} />
+      <SearchInput value={search} onChange={setSearch} placeholder="Search this page: title, message, target…" shown={filtered.length} total={logs.length} />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -106,10 +135,8 @@ export default function NotificationLogsPage() {
                 {new Date(n.createdAt).toLocaleString()}
               </span>
             )},
-            { key: "isRead", header: "Status", render: (n) => n.isRead ? (
-              <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium"><CheckCircle2 size={14} /> Read</span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium"><Circle size={14} /> Unread</span>
+            { key: "sender", header: "Sent By", render: (n) => (
+              <span className="text-slate-600">{n.sender?.name || "—"}</span>
             )},
             { key: "actions", header: "", render: (n) => (
               <div className="flex gap-1.5 justify-end">
@@ -119,6 +146,32 @@ export default function NotificationLogsPage() {
           ]}
           data={filtered}
         />
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-5">
+          <p className="text-sm text-slate-500">
+            Page {page} of {totalPages} ({total} entries)
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <ChevronLeft size={16} />
+              Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

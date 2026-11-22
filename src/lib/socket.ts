@@ -76,8 +76,28 @@ export function useSocket(events: Record<string, SocketHandler>) {
   return getSocket();
 }
 
-export function useRealtimeRefresh(refetch: () => void, events: string[]) {
-  const stableRefetch = useCallback(() => refetch(), [refetch]);
+/**
+ * Refetch when any of `events` arrives. With `debounceMs`, a burst of events
+ * triggers a single refetch once they have been quiet that long.
+ */
+export function useRealtimeRefresh(
+  refetch: () => void,
+  events: string[],
+  debounceMs = 0,
+) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stableRefetch = useCallback(() => {
+    if (!debounceMs) return refetch();
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(refetch, debounceMs);
+  }, [refetch, debounceMs]);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   useSocket(
     Object.fromEntries(events.map((e) => [e, stableRefetch])),

@@ -33,12 +33,30 @@ const processQueue = (error: unknown, token: string | null) => {
   failedQueue = [];
 };
 
+// A 401 from these means a wrong password/OTP or a dead refresh token, not an
+// expired session, so it goes straight back to the page to show the message.
+const AUTH_ENDPOINTS = [
+  "/api/admin/login",
+  "/api/admin/verify-otp",
+  "/api/admin/resend-otp",
+  "/api/auth/refresh-token",
+];
+
+const isAuthEndpoint = (url?: string) => {
+  const path = url?.split("?")[0];
+  return !!path && AUTH_ENDPOINTS.some((endpoint) => path.endsWith(endpoint));
+};
+
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint(originalRequest.url)
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

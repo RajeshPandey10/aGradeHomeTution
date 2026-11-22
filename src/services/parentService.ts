@@ -1,5 +1,25 @@
 import api from "@/lib/axios";
+import type {
+  Board,
+  CouponType,
+  Duration,
+  LockAction,
+  RequestStatus,
+  TeacherGender,
+  TeacherStatus,
+  TuitionType,
+} from "@/lib/enums";
 import { handleRequest } from "./api";
+
+// A user the backend sends either populated or as a bare id.
+export type UserRef =
+  | string
+  | { _id: string; name?: string; email?: string }
+  | null;
+
+/** The populated user behind a UserRef, or undefined when it is only an id. */
+export const populatedUser = (ref?: UserRef) =>
+  ref && typeof ref === "object" ? ref : undefined;
 
 export interface ParentProfile {
   _id: string;
@@ -7,16 +27,18 @@ export interface ParentProfile {
   phone?: string;
   address?: string;
   location?: string;
-  duration?: string;
-  tuitionType?: string;
+  duration?: Duration;
+  tuitionType?: TuitionType;
   daysPerWeek?: string;
-  numberOfDays?: number;
-  teacherGender?: string;
+  numberOfDays?: number | null;
+  teacherGender?: TeacherGender;
   numberOfStudents?: string;
   salary?: string;
-  status: string;
+  status: RequestStatus;
+  // Per-student arrays, aligned by index. subjects[i] is ONE comma-joined
+  // string for student i; level and medium may hold free text.
   subjects?: string[];
-  board?: string[];
+  board?: (Board | "")[];
   specificBoard?: string[];
   level?: string[];
   grade?: string[];
@@ -38,7 +60,7 @@ export interface ParentProfile {
       cv?: string;
       identification?: string[];
     };
-    action: string;
+    action: LockAction;
     at: string;
     expiresAt?: string | null;
     reason?: string | null;
@@ -56,7 +78,7 @@ export interface ParentProfile {
     payable: number;
     percentage: number;
     couponCode?: string | null;
-    couponType?: string | null;
+    couponType?: CouponType | null;
     couponValue?: number;
   };
   paymentSlip?: {
@@ -70,9 +92,9 @@ export interface ParentProfile {
     reasons?: string;
     phoneNumber?: string;
     qrImage?: string;
-    refundedBy?: { _id: string; name: string; email: string };
+    refundedBy?: UserRef;
     refundedAt?: string;
-    requestedBy?: { _id: string; name: string; email: string };
+    requestedBy?: UserRef;
     requestedAt?: string;
   };
   teacherProfile?: {
@@ -85,7 +107,7 @@ export interface ParentProfile {
     about?: string;
     cv?: string;
     identification?: string[];
-    status?: string;
+    status?: TeacherStatus;
   };
 }
 
@@ -104,13 +126,13 @@ export interface CreateParentRequestPayload {
   location: string;
   latitude?: number | null;
   longitude?: number | null;
-  duration: string;
-  tuitionType: string;
+  duration: Duration;
+  tuitionType: TuitionType;
   daysPerWeek: string;
-  numberOfDays?: number;
-  teacherGender: string;
+  numberOfDays?: number | null;
+  teacherGender: TeacherGender;
   numberOfStudents: string;
-  board: string[];
+  board: (Board | "")[];
   specificBoard: string[];
   level: string[];
   grade: string[];
@@ -160,7 +182,8 @@ export const parentService = {
   rejectRefund: (id: string, reason: string, resolution: "keep" | "vacant" | "delete" = "keep") =>
     handleRequest<ParentProfile & { deleted?: boolean }>(() => api.post(`/api/admin/parent-requests/${id}/reject-refund`, { reason, resolution })),
 
-  update: (id: string, data: Partial<ParentProfile>) =>
+  /** Only the fields a parent could enter; status, payment and refund have their own endpoints. */
+  update: (id: string, data: Partial<Omit<CreateParentRequestPayload, "parentId">>) =>
     handleRequest<ParentProfile>(() => api.put(`/api/parent/parent-request/${id}`, data)),
 
   delete: (id: string) =>

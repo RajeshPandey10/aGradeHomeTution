@@ -6,7 +6,9 @@ import { useSocket } from "@/lib/socket";
 import { unlockAudio } from "@/lib/alertSound";
 import { AdminAlert, presentAlert } from "@/lib/adminAlerts";
 import { parentService } from "@/services/parentService";
+import type { TeacherStatus } from "@/lib/enums";
 
+// From the app the request comes without the parent's contact details.
 type ParentRequestCreated = {
   request?: { _id?: string; name?: string; location?: string };
   requestId?: string;
@@ -14,8 +16,11 @@ type ParentRequestCreated = {
   createdBy?: string;
 };
 
+// Ids and status only; the profile itself (name, CV, ID) is never broadcast.
 type TeacherProfileEvent = {
-  profile?: { _id?: string; name?: string; status?: string };
+  profileId?: string;
+  status?: TeacherStatus;
+  userId?: string;
 };
 
 type BookingUnderReview = { requestId?: string };
@@ -72,15 +77,13 @@ export default function AdminEventNotifications() {
       });
     },
 
-    "teacher-profile:created": ({ profile }: TeacherProfileEvent = {}) => {
+    "teacher-profile:created": ({ profileId }: TeacherProfileEvent = {}) => {
       show({
         kind: "teacher-request",
         title: "New teacher request",
-        body: profile?.name
-          ? `${profile.name} submitted a profile for verification.`
-          : "A teacher profile is ready for review.",
+        body: "A teacher submitted a profile for verification.",
         href: "/admin/teacher-requests",
-        tag: `teacher-request:${profile?._id || Date.now()}`,
+        tag: `teacher-request:${profileId || Date.now()}`,
       });
     },
 
@@ -99,16 +102,14 @@ export default function AdminEventNotifications() {
     },
 
     // Fires on every profile edit; only resubmissions need a review.
-    "teacher-profile:updated": ({ profile }: TeacherProfileEvent = {}) => {
-      if (profile?.status !== "in_review") return;
+    "teacher-profile:updated": ({ profileId, status }: TeacherProfileEvent = {}) => {
+      if (status !== "in_review") return;
       show({
         kind: "teacher-request",
         title: "Teacher profile resubmitted",
-        body: profile.name
-          ? `${profile.name} updated their profile for review.`
-          : "A teacher updated their profile for review.",
+        body: "A teacher updated their profile for review.",
         href: "/admin/teacher-requests",
-        tag: `teacher-request:${profile._id || Date.now()}`,
+        tag: `teacher-request:${profileId || Date.now()}`,
       });
     },
 

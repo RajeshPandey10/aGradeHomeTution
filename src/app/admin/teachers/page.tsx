@@ -16,6 +16,7 @@ import {
 } from "@/components/admin/UI";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Modal } from "@/components/admin/Modal";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
@@ -54,8 +55,8 @@ export default function TeachersPage() {
         accounts: res.accountCount,
         withoutProfile: res.withoutProfileCount,
       });
-    } catch {
-      toast.error("Failed to load teachers");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load teachers"));
     } finally {
       setLoading(false);
     }
@@ -74,8 +75,8 @@ export default function TeachersPage() {
       toast.success("Teacher deleted");
       setDeleteTarget(null);
       fetch();
-    } catch {
-      toast.error("Failed to delete teacher");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete teacher"));
     } finally {
       setProcessing(null);
     }
@@ -160,14 +161,14 @@ export default function TeachersPage() {
               />
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={selected.status} />
+                  <StatusBadge status={selected.status} kind="teacherStatus" />
                   <span className="text-xs text-slate-400">
                     Registered {new Date(selected.createdAt).toLocaleDateString()}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 inline-flex items-center gap-1.5">
                   Online teaching:{" "}
-                  <StatusBadge status={selected.onlineTeaching?.status || "not_submitted"} />
+                  <StatusBadge status={selected.onlineTeaching?.status || "not_submitted"} kind="onlineTeachingStatus" />
                 </p>
               </div>
             </div>
@@ -264,7 +265,12 @@ export default function TeachersPage() {
               {
                 key: "verified",
                 header: "Email verified",
-                render: (t) => <StatusBadge status={t.isVerified ? "verified" : "unverified"} />,
+                render: (t) => (
+                  <StatusBadge
+                    status={t.isVerified ? "verified" : "unverified"}
+                    label={t.isVerified ? "Verified" : "Not verified"}
+                  />
+                ),
               },
               {
                 key: "signedUp",
@@ -346,7 +352,7 @@ export default function TeachersPage() {
               render: (t) => (
                 <span className="inline-flex items-center gap-1">
                   <ShieldCheck size={12} className="text-slate-400" />
-                  <StatusBadge status={t.status} />
+                  <StatusBadge status={t.status} kind="teacherStatus" />
                 </span>
               ),
             },

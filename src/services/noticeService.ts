@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import type { NoticeTargetRole } from "@/lib/enums";
 import { handleRequest } from "./api";
 
 export interface Notice {
@@ -9,7 +10,7 @@ export interface Notice {
   images?: string[];
   showAsPopup?: boolean;
   popupExpiresAt?: string | null;
-  targetRole?: "teacher" | "parent" | "both";
+  targetRole?: NoticeTargetRole;
   // Optional homepage countdown banner (website only)
   countdownTo?: string | null;
   ctaLabel?: string | null;
@@ -24,7 +25,7 @@ type NoticeInput = {
   images?: string[];
   showAsPopup?: boolean;
   popupExpiresAt?: string | null;
-  targetRole?: string;
+  targetRole?: NoticeTargetRole;
   countdownTo?: string | null;
   ctaLabel?: string | null;
   ctaHref?: string | null;

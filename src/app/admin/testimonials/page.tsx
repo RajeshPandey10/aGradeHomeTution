@@ -14,6 +14,7 @@ import {
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { getErrorMessage } from "@/lib/errors";
 
 type FormData = {
   name: string;
@@ -48,8 +49,8 @@ export default function TestimonialsPage() {
     try {
       const res = await testimonialService.getAll();
       setItems(res.data);
-    } catch {
-      toast.error("Failed to load testimonials");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load testimonials"));
     } finally {
       setLoading(false);
     }
@@ -104,11 +105,14 @@ export default function TestimonialsPage() {
       setForm(emptyForm);
       setEditing(null);
       fetchData();
-    } catch {
+    } catch (err) {
       toast.error(
-        editing
-          ? "Failed to update testimonial"
-          : "Failed to create testimonial",
+        getErrorMessage(
+          err,
+          editing
+            ? "Failed to update testimonial"
+            : "Failed to create testimonial",
+        ),
       );
     } finally {
       setSaving(false);
@@ -123,8 +127,8 @@ export default function TestimonialsPage() {
       toast.success("Testimonial deleted");
       setDeleteTarget(null);
       fetchData();
-    } catch {
-      toast.error("Failed to delete testimonial");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete testimonial"));
     } finally {
       setDeleting(false);
     }
@@ -136,8 +140,8 @@ export default function TestimonialsPage() {
         isPublished: !item.isPublished,
       });
       fetchData();
-    } catch {
-      toast.error("Failed to update testimonial");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update testimonial"));
     }
   };
 
@@ -366,6 +370,7 @@ export default function TestimonialsPage() {
                 >
                   <StatusBadge
                     status={t.isPublished ? "verified" : "unverified"}
+                    label={t.isPublished ? "Published" : "Hidden"}
                   />
                 </button>
               ),

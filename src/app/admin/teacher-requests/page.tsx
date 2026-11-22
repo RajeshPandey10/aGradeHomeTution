@@ -28,14 +28,10 @@ import {
 import { Modal } from "@/components/admin/Modal";
 import PdfViewer from "@/components/admin/pdf-viewer";
 import { SearchInput } from "@/components/admin/SearchInput";
+import { getErrorMessage } from "@/lib/errors";
+import { labelFor, optionsFor, type TeacherStatus } from "@/lib/enums";
 
-const STATUS_TABS = [
-  { label: "All", value: "" },
-  { label: "In Review", value: "in_review" },
-  { label: "Verified", value: "verified" },
-  { label: "Rejected", value: "rejected" },
-  { label: "Unverified", value: "unverified" },
-] as const;
+const STATUS_TABS = [{ label: "All", value: "" } as const, ...optionsFor("teacherStatus")];
 
 export default function TeacherRequestsPage() {
   const [requests, setRequests] = useState<TeacherProfile[]>([]);
@@ -46,7 +42,7 @@ export default function TeacherRequestsPage() {
   const [rejectionRemarks, setRejectionRemarks] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TeacherStatus | "">("");
   const [search, setSearch] = useState("");
   const toast = useToast();
 
@@ -57,8 +53,8 @@ export default function TeacherRequestsPage() {
         search.trim() || undefined,
       );
       setRequests(res.data);
-    } catch {
-      toast.error("Failed to load teacher requests");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load teacher requests"));
     } finally {
       setLoading(false);
     }
@@ -78,7 +74,7 @@ export default function TeacherRequestsPage() {
   ]);
 
   const handleApprove = useCallback(
-    async (profileId: string, status = "verified") => {
+    async (profileId: string, status: TeacherStatus = "verified") => {
       setProcessing(profileId);
       try {
         await teacherService.approve(profileId, status);
@@ -89,8 +85,8 @@ export default function TeacherRequestsPage() {
         );
         setSelected(null);
         fetchData();
-      } catch {
-        toast.error("Failed to update teacher status");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Failed to update teacher status"));
       } finally {
         setProcessing(null);
       }
@@ -118,8 +114,8 @@ export default function TeacherRequestsPage() {
       setRejectionRemarks("");
       setSelected(null);
       fetchData();
-    } catch {
-      toast.error("Failed to reject teacher");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to reject teacher"));
     } finally {
       setProcessing(null);
     }
@@ -192,7 +188,7 @@ export default function TeacherRequestsPage() {
               )}
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={selected.status} />
+                  <StatusBadge status={selected.status} kind="teacherStatus" />
                   {selected.createdAt && (
                     <span className="text-slate-400 text-xs">
                       Submitted {new Date(selected.createdAt).toLocaleDateString()}
@@ -481,9 +477,9 @@ export default function TeacherRequestsPage() {
         <EmptyState
           message={
             search.trim()
-              ? `No ${statusFilter ? `${statusFilter.replace(/_/g, " ")} ` : ""}requests match "${search.trim()}"`
+              ? `No ${statusFilter ? `${labelFor("teacherStatus", statusFilter).toLowerCase()} ` : ""}requests match "${search.trim()}"`
               : statusFilter
-                ? `No ${statusFilter.replace(/_/g, " ")} requests`
+                ? `No ${labelFor("teacherStatus", statusFilter).toLowerCase()} requests`
                 : "No verification requests"
           }
         />
@@ -537,7 +533,7 @@ export default function TeacherRequestsPage() {
               header: "Status",
               render: (r) => (
                 <div>
-                  <StatusBadge status={r.status} />
+                  <StatusBadge status={r.status} kind="teacherStatus" />
                   {r.status === "rejected" && r.rejectionReason && (
                     <p
                       className="text-red-500 text-xs mt-0.5 max-w-40 truncate"

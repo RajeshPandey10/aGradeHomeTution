@@ -18,7 +18,7 @@ import {
   ExternalLink,
   ZoomIn,
 } from "lucide-react";
-import { parentService, ParentProfile } from "@/services/parentService";
+import { parentService, ParentProfile, populatedUser } from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
 import { useRealtimeRefresh } from "@/lib/socket";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
@@ -29,6 +29,8 @@ import { SearchInput } from "@/components/admin/SearchInput";
 import { getImageUrl } from "@/lib/image";
 import { matchesSearch } from "@/lib/search";
 import api from "@/lib/axios";
+import { labelFor } from "@/lib/enums";
+import { getErrorMessage } from "@/lib/errors";
 
 interface TeacherProfileSnapshot {
   name?: string;
@@ -182,8 +184,8 @@ export default function RefundsPage() {
       setRequests(requestsRes.data || []);
       setApprovedLogs(approvedRes.data.data?.logs || []);
       setRejectedLogs(rejectedRes.data.data?.logs || []);
-    } catch {
-      toast.error("Failed to load refund requests");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load refund requests"));
     } finally {
       setLoading(false);
     }
@@ -207,8 +209,8 @@ export default function RefundsPage() {
       r.assignedTeacher?.phoneNumber,
       r.teacherProfile?.name,
       r.teacherProfile?.phone,
-      r.refund?.requestedBy?.name,
-      r.refund?.requestedBy?.email,
+      populatedUser(r.refund?.requestedBy)?.name,
+      populatedUser(r.refund?.requestedBy)?.email,
       r.refund?.reason,
       r.refund?.reasons,
       r.refund?.phoneNumber,
@@ -264,8 +266,8 @@ export default function RefundsPage() {
       setApproveReason("");
       setSelected(null);
       fetchAll();
-    } catch {
-      toast.error("Failed to approve refund");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to approve refund"));
     } finally {
       setProcessing(null);
     }
@@ -288,8 +290,8 @@ export default function RefundsPage() {
       setRejectResolution("keep");
       setSelected(null);
       fetchAll();
-    } catch {
-      toast.error("Failed to reject refund");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to reject refund"));
     } finally {
       setProcessing(null);
     }
@@ -335,7 +337,7 @@ export default function RefundsPage() {
               <DetailRow label="Name" value={selected.name} icon={User} />
               <DetailRow label="Location" value={selected.location} icon={MapPin} />
               <DetailRow label="Salary" value={selected.salary ? `Rs. ${selected.salary}` : undefined} icon={DollarSign} />
-              <DetailRow label="Duration" value={selected.duration} />
+              <DetailRow label="Duration" value={labelFor("duration", selected.duration)} />
             </div>
 
             {selected.parent && (
@@ -376,7 +378,7 @@ export default function RefundsPage() {
               <>
                 <SectionHeader title="Refund Request" />
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
-                  <DetailRow label="Requested By" value={selected.refund.requestedBy.name} icon={User} />
+                  <DetailRow label="Requested By" value={populatedUser(selected.refund.requestedBy)?.name} icon={User} />
                   <DetailRow label="Reason" value={selected.refund.reason || selected.refund.reasons} />
                   {selected.refund.phoneNumber && <DetailRow label="Phone" value={selected.refund.phoneNumber} icon={Phone} />}
                   <DetailRow label="Requested At" value={selected.refund.requestedAt ? new Date(selected.refund.requestedAt).toLocaleString() : undefined} icon={Calendar} />
@@ -409,7 +411,7 @@ export default function RefundsPage() {
                   <DetailRow label="Name" value={selectedLog.details.tuition.name} icon={User} />
                   <DetailRow label="Location" value={selectedLog.details.tuition.location} icon={MapPin} />
                   <DetailRow label="Salary" value={selectedLog.details.tuition.salary ? `Rs. ${selectedLog.details.tuition.salary}` : undefined} icon={DollarSign} />
-                  <DetailRow label="Duration" value={selectedLog.details.tuition.duration} />
+                  <DetailRow label="Duration" value={labelFor("duration", selectedLog.details.tuition.duration)} />
                 </div>
               </>
             )}
@@ -658,8 +660,8 @@ export default function RefundsPage() {
               )},
               { key: "requestedBy", header: "Requested By", render: (r) => (
                 <div>
-                  <span className="text-slate-900 font-medium">{r.refund?.requestedBy?.name || "—"}</span>
-                  <p className="text-slate-400 text-xs">{r.refund?.requestedBy?.email}</p>
+                  <span className="text-slate-900 font-medium">{populatedUser(r.refund?.requestedBy)?.name || "—"}</span>
+                  <p className="text-slate-400 text-xs">{populatedUser(r.refund?.requestedBy)?.email}</p>
                 </div>
               )},
               { key: "reason", header: "Reason", render: (r) => (

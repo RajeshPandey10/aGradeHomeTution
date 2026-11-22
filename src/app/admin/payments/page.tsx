@@ -13,7 +13,14 @@ import {
   Percent,
 } from "lucide-react";
 import { useRealtimeRefresh } from "@/lib/socket";
-import { parentService, ParentProfile } from "@/services/parentService";
+import {
+  parentService,
+  ParentProfile,
+  populatedUser,
+} from "@/services/parentService";
+import api from "@/lib/axios";
+import { localDayRange, toLocalDate } from "@/lib/datetime";
+import { labelFor } from "@/lib/enums";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import {
@@ -26,6 +33,7 @@ import {
 import { Modal } from "@/components/admin/Modal";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { getErrorMessage } from "@/lib/errors";
 
 function DetailRow({
   label,
@@ -50,6 +58,30 @@ function DetailRow({
   );
 }
 
+// A teacher has asked for a refund and it is waiting on an admin.
+const isRefundRequested = (r: ParentProfile) =>
+  r.status === "fulfilled" && !!r.refund?.requestedBy;
+
+// Approving a refund wipes the request's refund details, so completed refunds
+// are counted from the audit log instead of from the requests.
+const COMPLETED_REFUND_ACTIONS = ["refund_approved", "refund_executed"];
+
+async function countCompletedRefunds(range?: {
+  startDate: string;
+  endDate: string;
+}) {
+  const totals = await Promise.all(
+    COMPLETED_REFUND_ACTIONS.map(async (action) => {
+      const res = await api.get<{ data?: { total?: number } }>(
+        "/api/admin/audit-logs",
+        { params: { action, limit: 1, ...range } },
+      );
+      return res.data.data?.total ?? 0;
+    }),
+  );
+  return totals.reduce((sum, total) => sum + total, 0);
+}
+
 function SectionHeader({ title }: { title: string }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-600 border-b border-slate-200 pb-1 pt-3">
@@ -67,6 +99,10 @@ export default function PaymentsPage() {
   const [refundReason, setRefundReason] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [search, setSearch] = useState("");
+  const [refundCounts, setRefundCounts] = useState<{
+    overall: number;
+    onDate: number | null;
+  } | null>(null);
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
@@ -74,24 +110,44 @@ export default function PaymentsPage() {
       const res = await parentService.getRequests();
       const paymentRequests = (res.data || [])
         // Bookings under review are paid too; they count as revenue once accepted
-        .filter((r) => r.status === "fulfilled" || r.status === "under_review" || r.refund?.reason)
+        .filter((r) => r.status === "fulfilled" || r.status === "under_review" || r.refund?.refundedAt)
         .sort((a, b) => {
           const aDate = a.paymentSlip?.paidAt || a.createdAt || "";
           const bDate = b.paymentSlip?.paidAt || b.createdAt || "";
           return new Date(bDate).getTime() - new Date(aDate).getTime();
         });
       setRequests(paymentRequests);
-    } catch {
-      toast.error("Failed to load payments");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load payments"));
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
+  const fetchRefundCounts = useCallback(async () => {
+    try {
+      const [overall, onDate] = await Promise.all([
+        countCompletedRefunds(),
+        selectedDate ? countCompletedRefunds(localDayRange(selectedDate)) : null,
+      ]);
+      setRefundCounts({ overall, onDate });
+    } catch {
+      setRefundCounts(null); // the card shows "—"
+    }
+  }, [selectedDate]);
+
+  const refresh = useCallback(() => {
+    fetchAll();
+    fetchRefundCounts();
+  }, [fetchAll, fetchRefundCounts]);
+
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-  useRealtimeRefresh(fetchAll, ["request:fulfilled", "request:available", "request:under-review"]);
+  useEffect(() => {
+    fetchRefundCounts();
+  }, [fetchRefundCounts]);
+  useRealtimeRefresh(refresh, ["request:fulfilled", "request:available", "request:under-review"]);
 
   const handleView = useCallback(async (r: ParentProfile) => {
     try {
@@ -108,8 +164,8 @@ export default function PaymentsPage() {
       try {
         await parentService.resendInvoice(id);
         toast.success("Invoice email resent to teacher and parent");
-      } catch {
-        toast.error("Failed to resend invoice");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Failed to resend invoice"));
       } finally {
         setProcessing(null);
       }
@@ -126,13 +182,13 @@ export default function PaymentsPage() {
       setRefundTarget(null);
       setRefundReason("");
       setSelected(null);
-      fetchAll();
-    } catch {
-      toast.error("Failed to refund request");
+      refresh();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to refund request"));
     } finally {
       setProcessing(null);
     }
-  }, [refundTarget, refundReason, fetchAll, toast]);
+  }, [refundTarget, refundReason, refresh, toast]);
 
   const totalRevenue = requests
     .filter((r) => r.status === "fulfilled")
@@ -140,12 +196,11 @@ export default function PaymentsPage() {
   const totalFulfilled = requests.filter(
     (r) => r.status === "fulfilled",
   ).length;
-  const totalRefunded = requests.filter((r) => r.refund?.reason).length;
+  const refundsAwaiting = requests.filter(isRefundRequested).length;
   const dateRequests = selectedDate
-    ? requests.filter((r) => {
-        const paymentDate = r.paymentSlip?.paidAt || r.createdAt;
-        return paymentDate?.slice(0, 10) === selectedDate;
-      })
+    ? requests.filter(
+        (r) => toLocalDate(r.paymentSlip?.paidAt || r.createdAt) === selectedDate,
+      )
     : requests;
   const dateRevenue = dateRequests
     .filter((r) => r.status === "fulfilled")
@@ -153,14 +208,14 @@ export default function PaymentsPage() {
   const dateFulfilled = dateRequests.filter(
     (r) => r.status === "fulfilled",
   ).length;
-  const dateRefunded = dateRequests.filter((r) => r.refund?.reason).length;
   // Search narrows the table only; the summary cards above stay on the date filter.
   const filtered = dateRequests.filter((r) =>
     matchesSearch(search, [
       r.name,
       r.location,
       r.status,
-      r.refund?.reason && "refunded",
+      r.refund?.refundedAt && "refunded",
+      isRefundRequested(r) && "refund requested",
       r.parent?.name,
       r.parent?.email,
       r.parent?.phoneNumber,
@@ -242,14 +297,19 @@ export default function PaymentsPage() {
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-            {selectedDate ? "Selected Date Refunded" : "Overall Refunded"}
+            {selectedDate ? "Refunded on Selected Date" : "Overall Refunded"}
           </p>
           <p className="text-2xl font-bold text-red-600 mt-1">
-            {selectedDate ? dateRefunded : totalRefunded}
+            {(selectedDate ? refundCounts?.onDate : refundCounts?.overall) ?? "—"}
           </p>
-          {selectedDate && (
-            <p className="text-xs text-slate-400 mt-1">
-              Overall: {totalRefunded}
+          <p className="text-xs text-slate-400 mt-1">
+            Completed refunds, from the audit log
+            {selectedDate && refundCounts && ` · Overall: ${refundCounts.overall}`}
+          </p>
+          {refundsAwaiting > 0 && (
+            <p className="text-xs text-amber-600 mt-1">
+              {refundsAwaiting} refund{" "}
+              {refundsAwaiting === 1 ? "request" : "requests"} awaiting approval
             </p>
           )}
         </div>
@@ -265,8 +325,11 @@ export default function PaymentsPage() {
         {selected && (
           <div className="space-y-3 text-sm max-h-[75vh] overflow-y-auto pr-1">
             <div className="flex items-center gap-2 mb-1">
-              <StatusBadge status={selected.status} />
-              {selected.refund?.reason && <StatusBadge status="refunded" />}
+              <StatusBadge status={selected.status} kind="requestStatus" />
+              {selected.refund?.refundedAt && <StatusBadge status="refunded" />}
+              {isRefundRequested(selected) && (
+                <StatusBadge status="refund_requested" />
+              )}
               {selected.platformFeePercent != null && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
                   <Percent size={12} /> {selected.platformFeePercent}% fee
@@ -289,13 +352,16 @@ export default function PaymentsPage() {
               />
               <DetailRow
                 label="Duration"
-                value={selected.duration}
+                value={labelFor("duration", selected.duration)}
                 icon={Clock}
               />
-              <DetailRow label="Tuition Type" value={selected.tuitionType} />
+              <DetailRow
+                label="Tuition Type"
+                value={labelFor("tuitionType", selected.tuitionType)}
+              />
               <DetailRow
                 label="Subjects"
-                value={selected.subjects?.join(", ")}
+                value={selected.subjects?.join("; ")}
                 icon={BookOpen}
               />
             </div>
@@ -417,19 +483,38 @@ export default function PaymentsPage() {
               </>
             )}
 
-            {selected.refund?.reason && (
+            {(selected.refund?.refundedAt || isRefundRequested(selected)) && (
               <>
-                <SectionHeader title="Refund Info" />
+                <SectionHeader
+                  title={
+                    selected.refund?.refundedAt ? "Refund Info" : "Refund Requested"
+                  }
+                />
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <DetailRow label="Reason" value={selected.refund.reason} />
+                  <DetailRow
+                    label="Reason"
+                    value={selected.refund?.reason || selected.refund?.reasons}
+                  />
+                  <DetailRow
+                    label="Requested By"
+                    value={populatedUser(selected.refund?.requestedBy)?.name}
+                  />
+                  <DetailRow
+                    label="Requested At"
+                    value={
+                      selected.refund?.requestedAt
+                        ? new Date(selected.refund.requestedAt).toLocaleString()
+                        : undefined
+                    }
+                  />
                   <DetailRow
                     label="Refunded By"
-                    value={selected.refund.refundedBy?.name}
+                    value={populatedUser(selected.refund?.refundedBy)?.name}
                   />
                   <DetailRow
                     label="Refunded At"
                     value={
-                      selected.refund.refundedAt
+                      selected.refund?.refundedAt
                         ? new Date(selected.refund.refundedAt).toLocaleString()
                         : undefined
                     }
@@ -643,8 +728,11 @@ export default function PaymentsPage() {
               header: "Status",
               render: (r) => (
                 <div className="flex gap-1">
-                  <StatusBadge status={r.status} />
-                  {r.refund?.reason && <StatusBadge status="refunded" />}
+                  <StatusBadge status={r.status} kind="requestStatus" />
+                  {r.refund?.refundedAt && <StatusBadge status="refunded" />}
+                  {isRefundRequested(r) && (
+                    <StatusBadge status="refund_requested" />
+                  )}
                 </div>
               ),
             },

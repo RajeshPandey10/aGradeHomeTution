@@ -6,6 +6,7 @@ import { cmsService, CMSItem } from "@/services/cmsService";
 import { useToast } from "@/hooks/useToast";
 import { PageHeader } from "@/components/admin/DataTable";
 import { ActionButtonSolid, Loading } from "@/components/admin/UI";
+import { getErrorMessage } from "@/lib/errors";
 
 const cmsTypes = [
   { value: "faq", label: "FAQ" },
@@ -30,8 +31,8 @@ export default function CMSPage() {
       const items = res.data;
       const item = items.find((c: CMSItem) => c.type === type);
       setContent(item?.content || "");
-    } catch {
-      toast.error("Failed to load CMS content");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load CMS content"));
     } finally {
       setLoading(false);
     }
@@ -44,8 +45,8 @@ export default function CMSPage() {
     try {
       await cmsService.upsert(selectedType, content);
       toast.success("CMS updated successfully");
-    } catch {
-      toast.error("Failed to update CMS");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update CMS"));
     } finally {
       setSaving(false);
     }

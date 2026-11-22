@@ -1,10 +1,11 @@
 import api from "@/lib/axios";
+import type { CouponType } from "@/lib/enums";
 import { handleRequest } from "./api";
 
 export interface Coupon {
   _id: string;
   code: string;
-  couponType: "percentage" | "flat";
+  couponType: CouponType;
   couponValue: number;
   maxUses: number | null;
   usedCount: number;
@@ -17,7 +18,7 @@ export const couponService = {
   getAll: () =>
     handleRequest<Coupon[]>(() => api.get("/api/admin/coupons")),
 
-  create: (data: { code: string; couponType: string; couponValue: number; maxUses?: number | null; expiresAt?: string | null }) =>
+  create: (data: { code: string; couponType: CouponType; couponValue: number; maxUses?: number | null; expiresAt?: string | null }) =>
     handleRequest<Coupon>(() => api.post("/api/admin/coupons", data)),
 
   update: (id: string, data: Partial<Coupon>) =>

@@ -14,6 +14,7 @@ import {
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { getErrorMessage } from "@/lib/errors";
 
 type FormData = {
   question: string;
@@ -44,8 +45,8 @@ export default function FaqItemsPage() {
     try {
       const res = await faqService.getAll();
       setItems(res.data);
-    } catch {
-      toast.error("Failed to load FAQ items");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load FAQ items"));
     } finally {
       setLoading(false);
     }
@@ -96,9 +97,12 @@ export default function FaqItemsPage() {
       setForm(emptyForm);
       setEditing(null);
       fetchData();
-    } catch {
+    } catch (err) {
       toast.error(
-        editing ? "Failed to update FAQ item" : "Failed to create FAQ item",
+        getErrorMessage(
+          err,
+          editing ? "Failed to update FAQ item" : "Failed to create FAQ item",
+        ),
       );
     } finally {
       setSaving(false);
@@ -113,8 +117,8 @@ export default function FaqItemsPage() {
       toast.success("FAQ item deleted");
       setDeleteTarget(null);
       fetchData();
-    } catch {
-      toast.error("Failed to delete FAQ item");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete FAQ item"));
     } finally {
       setDeleting(false);
     }
@@ -124,8 +128,8 @@ export default function FaqItemsPage() {
     try {
       await faqService.update(item._id, { isPublished: !item.isPublished });
       fetchData();
-    } catch {
-      toast.error("Failed to update FAQ item");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to update FAQ item"));
     }
   };
 
@@ -316,6 +320,7 @@ export default function FaqItemsPage() {
                 >
                   <StatusBadge
                     status={i.isPublished ? "verified" : "unverified"}
+                    label={i.isPublished ? "Published" : "Hidden"}
                   />
                 </button>
               ),

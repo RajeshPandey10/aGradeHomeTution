@@ -9,6 +9,7 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { DataTable, PageHeader } from "@/components/admin/DataTable";
 import { ActionButton, EmptyState, Loading } from "@/components/admin/UI";
+import { getErrorMessage } from "@/lib/errors";
 
 const formatDate = (date: string | null) => {
   if (!date) return "-";
@@ -40,8 +41,8 @@ export default function EmailSendersPage() {
 
       try {
         setSenders(await emailSenderService.getStatuses());
-      } catch {
-        toast.error("Failed to load email sender statuses");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Failed to load email sender statuses"));
       } finally {
         setLoading(false);
         setRefreshing(false);

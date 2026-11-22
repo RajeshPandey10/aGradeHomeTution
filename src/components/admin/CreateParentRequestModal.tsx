@@ -4,6 +4,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { CheckCircle, Plus, Trash2, X } from "lucide-react";
 import { Modal } from "@/components/admin/Modal";
+import {
+  Field,
+  Select,
+  StudentsSection,
+  TuitionFieldsSection,
+  emptyStudent,
+  emptyTuitionFields,
+  inputClass,
+  resizeStudents,
+  studentsPayload,
+  tuitionFieldsPayload,
+  validateTuition,
+  type Student,
+  type TuitionFieldValues,
+} from "@/components/admin/TuitionFields";
 import { useToast } from "@/hooks/useToast";
 import { getErrorMessage } from "@/services/api";
 import {
@@ -16,56 +31,15 @@ const LocationPicker = dynamic(() => import("@/components/admin/LocationPicker")
   ssr: false,
 });
 
-// Same option values the parent app sends, so admin-entered requests look
-// identical to parent-submitted ones everywhere downstream.
-const TUITION_TYPES = ["Physical", "Online"];
-const DURATIONS = [
-  { value: "Long term", label: "Long term" },
-  { value: "Short term", label: "Short term" },
-];
-const SHORT_TERM_DAYS = ["7", "10", "15", "20", "25", "30"];
-const DAYS_PER_WEEK = ["6", "5", "4", "3", "2", "1"];
-const GENDERS = ["Any", "Male", "Female"];
-const STUDENT_COUNTS = ["1", "2", "3", "4", "5"];
-const BOARDS = [
-  { value: "neb", label: "Nepal Education Board" },
-  { value: "cbse", label: "CBSE" },
-  { value: "cambridge", label: "IB" },
-  { value: "other", label: "Other" },
-];
-const LEVELS = [
-  { value: "PG", label: "PlayGroup (PG)" },
-  { value: "school", label: "1-10" },
-  { value: "higher", label: "11-12" },
-  { value: "other", label: "Other" },
-];
-const MEDIUMS = ["English", "Nepali"];
-
-type Student = {
-  board: string;
-  customBoard: string;
-  level: string;
-  customLevel: string;
-  grade: string;
-  subjects: string;
-  medium: string;
-};
-
 type Slot = { start: string; end: string };
 
-type FormState = {
+type FormState = TuitionFieldValues & {
   parentId: string;
   name: string;
   phone: string;
   location: string;
   latitude: number | null;
   longitude: number | null;
-  tuitionType: string;
-  duration: string;
-  numberOfDays: string;
-  daysPerWeek: string;
-  teacherGender: string;
-  numberOfStudents: string;
   students: Student[];
   slots: Slot[];
   salary: string;
@@ -73,29 +47,14 @@ type FormState = {
   publish: boolean;
 };
 
-const emptyStudent = (): Student => ({
-  board: "",
-  customBoard: "",
-  level: "",
-  customLevel: "",
-  grade: "",
-  subjects: "",
-  medium: "",
-});
-
 const initialForm = (): FormState => ({
+  ...emptyTuitionFields(),
   parentId: "",
   name: "",
   phone: "",
   location: "",
   latitude: null,
   longitude: null,
-  tuitionType: "",
-  duration: "",
-  numberOfDays: "",
-  daysPerWeek: "",
-  teacherGender: "",
-  numberOfStudents: "1",
   students: [emptyStudent()],
   slots: [{ start: "", end: "" }],
   salary: "",
@@ -117,7 +76,7 @@ const toMinutes = (value: string) => {
 };
 
 function validate(form: FormState) {
-  const errors: Record<string, string> = {};
+  const errors = validateTuition(form, form.students);
   const required = (key: keyof FormState, message: string) => {
     if (!String(form[key] ?? "").trim()) errors[key] = message;
   };
@@ -128,25 +87,8 @@ function validate(form: FormState) {
     errors.phone = "Use digits only, e.g. 9800000000";
   }
   required("location", "Enter the location or pick it on the map");
-  required("tuitionType", "Choose a tuition type");
-  required("duration", "Choose a duration");
-  if (form.duration === "Short term") required("numberOfDays", "Choose the number of days");
-  required("daysPerWeek", "Choose days per week");
-  required("teacherGender", "Choose a teacher gender");
   required("salary", "Enter the salary");
   if (form.salary.trim() && !/\d/.test(form.salary)) errors.salary = "Salary needs an amount";
-
-  form.students.forEach((s, i) => {
-    if (!s.board) errors[`students.${i}.board`] = "Choose a board";
-    if (s.board === "other" && !s.customBoard.trim())
-      errors[`students.${i}.customBoard`] = "Name the board";
-    if (!s.level) errors[`students.${i}.level`] = "Choose a level";
-    if (s.level === "other" && !s.customLevel.trim())
-      errors[`students.${i}.customLevel`] = "Name the level";
-    if (!s.grade.trim()) errors[`students.${i}.grade`] = "Enter the grade";
-    if (!s.subjects.trim()) errors[`students.${i}.subjects`] = "Enter at least one subject";
-    if (!s.medium) errors[`students.${i}.medium`] = "Choose a medium";
-  });
 
   const filledSlots = form.slots.filter((s) => s.start || s.end);
   if (filledSlots.length === 0) errors["slots.0"] = "Add at least one time slot";
@@ -162,7 +104,6 @@ function validate(form: FormState) {
 }
 
 function toPayload(form: FormState): CreateParentRequestPayload {
-  const students = form.students;
   return {
     ...(form.parentId ? { parentId: form.parentId } : {}),
     name: form.name.trim(),
@@ -170,89 +111,15 @@ function toPayload(form: FormState): CreateParentRequestPayload {
     location: form.location.trim(),
     latitude: form.latitude,
     longitude: form.longitude,
-    tuitionType: form.tuitionType,
-    duration: form.duration,
-    ...(form.duration === "Short term" ? { numberOfDays: Number(form.numberOfDays) } : {}),
-    daysPerWeek: form.daysPerWeek,
-    teacherGender: form.teacherGender,
-    numberOfStudents: form.numberOfStudents,
+    ...tuitionFieldsPayload(form),
     // One entry per student, index-aligned — the same shape the parent app sends.
-    board: students.map((s) => s.board),
-    specificBoard: students
-      .filter((s) => s.board === "other")
-      .map((s) => s.customBoard.trim())
-      .filter(Boolean),
-    level: students.map((s) => (s.level === "other" ? s.customLevel.trim() : s.level)),
-    grade: students.map((s) => s.grade.trim()),
-    subjects: students.map((s) => s.subjects.trim()),
-    medium: students.map((s) => s.medium),
+    ...studentsPayload(form.students),
     timeSlots: form.slots
       .filter((s) => s.start && s.end)
       .map((s) => ({ start: to12Hour(s.start), end: to12Hour(s.end) })),
     salary: form.salary.trim(),
     requirements: form.requirements.trim() || undefined,
   };
-}
-
-const inputClass = (invalid?: boolean) =>
-  `w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 ${
-    invalid ? "border-red-300 focus:ring-red-500" : "border-slate-300 focus:ring-blue-500"
-  }`;
-
-function Field({
-  label,
-  error,
-  hint,
-  children,
-  className = "",
-}: {
-  label: string;
-  error?: string;
-  hint?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wider text-slate-400">
-        {label}
-      </span>
-      {children}
-      {error ? (
-        <span className="mt-1 block text-xs text-red-600">{error}</span>
-      ) : hint ? (
-        <span className="mt-1 block text-xs text-slate-400">{hint}</span>
-      ) : null}
-    </label>
-  );
-}
-
-function Select({
-  value,
-  onChange,
-  options,
-  placeholder = "Select",
-  invalid,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: (string | { value: string; label: string })[];
-  placeholder?: string;
-  invalid?: boolean;
-}) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass(invalid)}>
-      <option value="">{placeholder}</option>
-      {options.map((o) => {
-        const { value: v, label } = typeof o === "string" ? { value: o, label: o } : o;
-        return (
-          <option key={v} value={v}>
-            {label}
-          </option>
-        );
-      })}
-    </select>
-  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -327,13 +194,19 @@ export default function CreateParentRequestModal({
     });
   }, []);
 
-  const setStudentCount = useCallback((count: string) => {
-    const n = Number(count) || 1;
+  const updateTuition = useCallback((patch: Partial<TuitionFieldValues>) => {
     setForm((f) => ({
       ...f,
-      numberOfStudents: count,
-      students: Array.from({ length: n }, (_, i) => f.students[i] || emptyStudent()),
+      ...patch,
+      students: patch.numberOfStudents
+        ? resizeStudents(f.students, Number(patch.numberOfStudents))
+        : f.students,
     }));
+    setErrors((e) => {
+      const next = { ...e };
+      Object.keys(patch).forEach((k) => delete next[k]);
+      return next;
+    });
   }, []);
 
   const linkParent = useCallback(
@@ -469,140 +342,12 @@ export default function CreateParentRequestModal({
 
         <section className="space-y-4">
           <SectionTitle>Tuition</SectionTitle>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="Tuition type" error={errors.tuitionType}>
-              <Select
-                value={form.tuitionType}
-                onChange={(v) => update("tuitionType", v)}
-                options={TUITION_TYPES}
-                invalid={!!errors.tuitionType}
-              />
-            </Field>
-            <Field label="Duration" error={errors.duration}>
-              <Select
-                value={form.duration}
-                onChange={(v) => update("duration", v)}
-                options={DURATIONS}
-                invalid={!!errors.duration}
-              />
-            </Field>
-            {form.duration === "Short term" && (
-              <Field label="Number of days" error={errors.numberOfDays}>
-                <Select
-                  value={form.numberOfDays}
-                  onChange={(v) => update("numberOfDays", v)}
-                  options={SHORT_TERM_DAYS.map((d) => ({ value: d, label: `${d} days` }))}
-                  invalid={!!errors.numberOfDays}
-                />
-              </Field>
-            )}
-            <Field label="Days per week" error={errors.daysPerWeek}>
-              <Select
-                value={form.daysPerWeek}
-                onChange={(v) => update("daysPerWeek", v)}
-                options={DAYS_PER_WEEK}
-                invalid={!!errors.daysPerWeek}
-              />
-            </Field>
-            <Field label="Teacher gender" error={errors.teacherGender}>
-              <Select
-                value={form.teacherGender}
-                onChange={(v) => update("teacherGender", v)}
-                options={GENDERS}
-                invalid={!!errors.teacherGender}
-              />
-            </Field>
-            <Field label="Number of students">
-              <Select
-                value={form.numberOfStudents}
-                onChange={setStudentCount}
-                options={STUDENT_COUNTS}
-                placeholder="Select"
-              />
-            </Field>
-          </div>
+          <TuitionFieldsSection value={form} errors={errors} onChange={updateTuition} />
         </section>
 
         <section className="space-y-4">
           <SectionTitle>{form.students.length > 1 ? "Students" : "Student"}</SectionTitle>
-          {form.students.map((student, i) => {
-            const err = (k: string) => errors[`students.${i}.${k}`];
-            return (
-              <div
-                key={i}
-                className={form.students.length > 1 ? "rounded-lg border border-slate-200 p-4" : ""}
-              >
-                {form.students.length > 1 && (
-                  <p className="mb-3 text-xs font-semibold text-slate-700">Student {i + 1}</p>
-                )}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <Field label="Board" error={err("board")}>
-                    <Select
-                      value={student.board}
-                      onChange={(v) => updateStudent(i, { board: v })}
-                      options={BOARDS}
-                      invalid={!!err("board")}
-                    />
-                  </Field>
-                  {student.board === "other" && (
-                    <Field label="Which board" error={err("customBoard")}>
-                      <input
-                        className={inputClass(!!err("customBoard"))}
-                        value={student.customBoard}
-                        onChange={(e) => updateStudent(i, { customBoard: e.target.value })}
-                      />
-                    </Field>
-                  )}
-                  <Field label="Level" error={err("level")}>
-                    <Select
-                      value={student.level}
-                      onChange={(v) => updateStudent(i, { level: v })}
-                      options={LEVELS}
-                      invalid={!!err("level")}
-                    />
-                  </Field>
-                  {student.level === "other" && (
-                    <Field label="Which level" error={err("customLevel")}>
-                      <input
-                        className={inputClass(!!err("customLevel"))}
-                        value={student.customLevel}
-                        onChange={(e) => updateStudent(i, { customLevel: e.target.value })}
-                      />
-                    </Field>
-                  )}
-                  <Field label="Grade" error={err("grade")}>
-                    <input
-                      className={inputClass(!!err("grade"))}
-                      value={student.grade}
-                      onChange={(e) => updateStudent(i, { grade: e.target.value })}
-                      placeholder="e.g. 7"
-                    />
-                  </Field>
-                  <Field label="Medium" error={err("medium")}>
-                    <Select
-                      value={student.medium}
-                      onChange={(v) => updateStudent(i, { medium: v })}
-                      options={MEDIUMS}
-                      invalid={!!err("medium")}
-                    />
-                  </Field>
-                  <Field
-                    label="Subjects"
-                    error={err("subjects")}
-                    hint="Separate with commas"
-                    className="sm:col-span-3"
-                  >
-                    <input
-                      className={inputClass(!!err("subjects"))}
-                      value={student.subjects}
-                      onChange={(e) => updateStudent(i, { subjects: e.target.value })}
-                      placeholder="e.g. Math, Science"
-                    />
-                  </Field>
-                </div>
-              </div>
-            );
-          })}
+          <StudentsSection students={form.students} errors={errors} onChange={updateStudent} />
         </section>
 
         <section className="space-y-4">

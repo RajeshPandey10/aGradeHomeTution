@@ -73,6 +73,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen, logout } = useAuthStore();
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   return (
     <>
@@ -110,8 +111,11 @@ export default function Sidebar() {
 
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-2 py-4">
           {navItems.map((item) => {
+            // Every admin route starts with /admin, so Dashboard matches only itself.
             const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+              item.href === "/admin"
+                ? pathname === item.href
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.href}
@@ -147,7 +151,11 @@ export default function Sidebar() {
       <ConfirmDialog
         open={logoutOpen}
         onClose={() => setLogoutOpen(false)}
-        onConfirm={() => logout()}
+        onConfirm={() => {
+          setLoggingOut(true);
+          void logout();
+        }}
+        loading={loggingOut}
         title="Logout"
         message="Are you sure you want to logout from the admin panel?"
         confirmLabel="Logout"

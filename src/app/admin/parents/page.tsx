@@ -8,6 +8,7 @@ import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { Loading, EmptyState, StatusBadge } from "@/components/admin/UI";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { getErrorMessage } from "@/lib/errors";
 
 interface Parent {
   _id: string;
@@ -28,8 +29,8 @@ export default function ParentsPage() {
     try {
       const res = await api.get("/api/admin/parents");
       setParents(res.data.data || []);
-    } catch {
-      toast.error("Failed to load parents");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load parents"));
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,7 @@ export default function ParentsPage() {
             { key: "phone", header: "Phone", render: (p) => (
               <span className="inline-flex items-center gap-1.5 text-slate-500"><Phone size={14} />{p.phoneNumber || "—"}</span>
             )},
-            { key: "verified", header: "Verified", render: (p) => <StatusBadge status={p.isVerified ? "verified" : "pending"} /> },
+            { key: "verified", header: "Verified", render: (p) => <StatusBadge status={p.isVerified ? "verified" : "pending"} label={p.isVerified ? "Verified" : "Not verified"} /> },
             { key: "joined", header: "Joined", render: (p) => (
               <span className="inline-flex items-center gap-1.5 text-slate-500"><Calendar size={14} />{new Date(p.createdAt).toLocaleDateString()}</span>
             )},

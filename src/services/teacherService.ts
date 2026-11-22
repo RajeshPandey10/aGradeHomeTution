@@ -1,31 +1,17 @@
 import api from "@/lib/axios";
+import type {
+  OnlineClassLevel,
+  OnlineTeachingStatus,
+  TeacherStatus,
+} from "@/lib/enums";
 import { handleRequest } from "./api";
-
-/**
- * Classes a teacher can choose on the online teaching form. Keys mirror the
- * backend's src/utils/onlineTeaching.js and the app's online_teaching_form.dart.
- */
-export const ONLINE_CLASS_LEVELS: { key: string; label: string }[] = [
-  { key: "pre_primary", label: "Pre-primary" },
-  { key: "upto_grade_5", label: "Up to Grade 5" },
-  { key: "grade_5_to_8", label: "Grade 5 to 8" },
-  { key: "grade_9_to_10", label: "Grade 9 to 10" },
-  { key: "grade_11_to_12", label: "Grade 11 to 12" },
-  { key: "bachelor", label: "Bachelor" },
-  { key: "entrance_preparation", label: "Entrance Preparation" },
-  { key: "gre_pte_sat", label: "GRE / PTE / SAT" },
-  { key: "others", label: "Others" },
-];
-
-export const onlineClassLabel = (key: string) =>
-  ONLINE_CLASS_LEVELS.find((l) => l.key === key)?.label ?? key;
 
 /** A teacher's online teaching verification (needed for online tuitions). */
 export interface OnlineTeaching {
-  status: "not_submitted" | "in_review" | "verified" | "rejected";
+  status: OnlineTeachingStatus;
   hasPenTablet?: boolean | null;
   demoVideoUrl?: string | null;
-  classLevels?: string[];
+  classLevels?: OnlineClassLevel[];
   entrancePreparation?: string | null;
   otherClasses?: string | null;
   experience?: string | null;
@@ -45,7 +31,7 @@ export interface TeacherProfile {
   gender?: string;
   cv?: string;
   identification?: string[];
-  status: string;
+  status: TeacherStatus;
   rejectionReason?: string | null;
   rejectionRemarks?: string | null;
   rejectedAt?: string | null;
@@ -66,7 +52,7 @@ export interface TeacherAccount {
 }
 
 export const teacherService = {
-  getRequests: (status?: string, search?: string) =>
+  getRequests: (status?: TeacherStatus, search?: string) =>
     handleRequest<TeacherProfile[]>(() =>
       api.get("/api/admin/teacher-requests", {
         params: { ...(status ? { status } : {}), ...(search ? { search } : {}) },
@@ -92,14 +78,14 @@ export const teacherService = {
       api.get("/api/admin/teachers/without-profile", { params: search ? { search } : {} }),
     ),
 
-  approve: (profileId: string, status: string, rejectionReason?: string, rejectionRemarks?: string) =>
+  approve: (profileId: string, status: TeacherStatus, rejectionReason?: string, rejectionRemarks?: string) =>
     handleRequest<TeacherProfile>(() => api.post("/api/admin/teachers/approve", { profileId, status, rejectionReason, rejectionRemarks })),
 
   delete: (id: string) =>
     handleRequest<void>(() => api.delete(`/api/admin/teachers/${id}`)),
 
   /** Teachers who submitted the online teaching form, those in review first. */
-  getOnlineVerifications: async (status?: string, search?: string) => {
+  getOnlineVerifications: async (status?: OnlineTeachingStatus, search?: string) => {
     const res = await api.get("/api/admin/online-verifications", {
       params: { ...(status ? { status } : {}), ...(search ? { search } : {}) },
     });

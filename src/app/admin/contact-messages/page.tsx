@@ -15,18 +15,15 @@ import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Modal } from "@/components/admin/Modal";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
+import { getErrorMessage } from "@/lib/errors";
+import { labelFor, optionsFor, type ContactStatus } from "@/lib/enums";
 
-const STATUS_TABS = [
-  { key: "", label: "All" },
-  { key: "new", label: "New" },
-  { key: "read", label: "Read" },
-  { key: "replied", label: "Replied" },
-] as const;
+const STATUS_TABS = [{ value: "", label: "All" } as const, ...optionsFor("contactStatus")];
 
 export default function ContactMessagesPage() {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<ContactStatus | "">("");
   const [search, setSearch] = useState("");
   const [active, setActive] = useState<ContactMessage | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -40,8 +37,8 @@ export default function ContactMessagesPage() {
     try {
       const res = await contactService.getAll(statusFilter || undefined);
       setMessages(res.data);
-    } catch {
-      toast.error("Failed to load contact messages");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load contact messages"));
     } finally {
       setLoading(false);
     }
@@ -73,8 +70,8 @@ export default function ContactMessagesPage() {
       setActive(null);
       setReplyText("");
       fetchData();
-    } catch {
-      toast.error("Failed to send reply");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to send reply"));
     } finally {
       setSending(false);
     }
@@ -88,8 +85,8 @@ export default function ContactMessagesPage() {
       toast.success("Message deleted");
       setDeleteTarget(null);
       fetchData();
-    } catch {
-      toast.error("Failed to delete message");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete message"));
     } finally {
       setDeleting(false);
     }
@@ -125,10 +122,10 @@ export default function ContactMessagesPage() {
       <div className="mb-5 flex gap-2 flex-wrap">
         {STATUS_TABS.map((tab) => (
           <button
-            key={tab.key}
-            onClick={() => setStatusFilter(tab.key)}
+            key={tab.value}
+            onClick={() => setStatusFilter(tab.value)}
             className={`px-3.5 py-1.5 text-sm font-medium rounded-full border transition-colors cursor-pointer ${
-              statusFilter === tab.key
+              statusFilter === tab.value
                 ? "bg-blue-600 border-blue-600 text-white"
                 : "border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
@@ -168,7 +165,7 @@ export default function ContactMessagesPage() {
                   </p>
                 )}
               </div>
-              <StatusBadge status={active.status} />
+              <StatusBadge status={active.status} kind="contactStatus" />
             </div>
 
             <div>
@@ -236,7 +233,7 @@ export default function ContactMessagesPage() {
         <EmptyState
           message={
             search.trim()
-              ? `No ${statusFilter ? `${statusFilter} ` : ""}messages match "${search.trim()}"`
+              ? `No ${statusFilter ? `${labelFor("contactStatus", statusFilter).toLowerCase()} ` : ""}messages match "${search.trim()}"`
               : "No contact messages yet"
           }
         />
@@ -281,7 +278,7 @@ export default function ContactMessagesPage() {
             {
               key: "status",
               header: "Status",
-              render: (m) => <StatusBadge status={m.status} />,
+              render: (m) => <StatusBadge status={m.status} kind="contactStatus" />,
             },
             {
               key: "actions",

@@ -16,6 +16,8 @@ import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import { Loading, EmptyState } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import api from "@/lib/axios";
+import { getErrorMessage } from "@/lib/errors";
+import { labelFor, matchValue, optionsFor, type AuditAction } from "@/lib/enums";
 
 interface AuditLog {
   _id: string;
@@ -41,108 +43,40 @@ interface AuditLog {
   createdAt: string;
 }
 
-const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  teacher_approved: {
-    label: "Teacher Approved",
-    color: "bg-emerald-100 text-emerald-700",
-  },
-  teacher_rejected: {
-    label: "Teacher Rejected",
-    color: "bg-red-100 text-red-700",
-  },
-  teacher_status_changed: {
-    label: "Teacher Status Changed",
-    color: "bg-amber-100 text-amber-700",
-  },
-  teacher_deleted: {
-    label: "Teacher Deleted",
-    color: "bg-red-100 text-red-700",
-  },
-  request_approved: {
-    label: "Request Approved",
-    color: "bg-emerald-100 text-emerald-700",
-  },
-  request_fulfilled_by_admin: {
-    label: "Request Fulfilled",
-    color: "bg-blue-100 text-blue-700",
-  },
-  request_deleted: {
-    label: "Request Deleted",
-    color: "bg-red-100 text-red-700",
-  },
-  refund_requested: {
-    label: "Refund Requested",
-    color: "bg-orange-100 text-orange-700",
-  },
-  refund_approved: {
-    label: "Refund Approved",
-    color: "bg-emerald-100 text-emerald-700",
-  },
-  refund_executed: {
-    label: "Refund Executed",
-    color: "bg-purple-100 text-purple-700",
-  },
-  payment_manual_submitted: {
-    label: "Manual Payment",
-    color: "bg-blue-100 text-blue-700",
-  },
-  payment_esewa_verified: {
-    label: "eSewa Payment",
-    color: "bg-green-100 text-green-700",
-  },
-  booking_approved: {
-    label: "Booking Accepted",
-    color: "bg-emerald-100 text-emerald-700",
-  },
-  booking_declined: {
-    label: "Booking Declined",
-    color: "bg-red-100 text-red-700",
-  },
-  online_verification_submitted: {
-    label: "Online Form Submitted",
-    color: "bg-blue-100 text-blue-700",
-  },
-  online_verification_approved: {
-    label: "Online Teaching Approved",
-    color: "bg-emerald-100 text-emerald-700",
-  },
-  online_verification_rejected: {
-    label: "Online Teaching Rejected",
-    color: "bg-red-100 text-red-700",
-  },
-  account_deleted: {
-    label: "Account Deleted",
-    color: "bg-red-100 text-red-700",
-  },
+const RED = "bg-red-100 text-red-700";
+const GREEN = "bg-emerald-100 text-emerald-700";
+const BLUE = "bg-blue-100 text-blue-700";
+const AMBER = "bg-amber-100 text-amber-700";
+
+// Labels come from src/lib/enums.ts; only the colours live here.
+const ACTION_COLORS: Record<AuditAction, string> = {
+  teacher_approved: GREEN,
+  teacher_rejected: RED,
+  teacher_status_changed: AMBER,
+  teacher_deleted: RED,
+  request_created_by_admin: BLUE,
+  request_updated_by_admin: AMBER,
+  request_approved: GREEN,
+  request_fulfilled_by_admin: BLUE,
+  request_deleted: RED,
+  booking_approved: GREEN,
+  booking_declined: RED,
+  payment_manual_submitted: BLUE,
+  payment_esewa_verified: "bg-green-100 text-green-700",
+  refund_requested: "bg-orange-100 text-orange-700",
+  refund_approved: GREEN,
+  refund_rejected: RED,
+  refund_executed: "bg-purple-100 text-purple-700",
+  online_verification_submitted: BLUE,
+  online_verification_approved: GREEN,
+  online_verification_rejected: RED,
+  notice_deleted: RED,
+  account_deleted: RED,
 };
 
-const ACTION_OPTIONS = [
-  { value: "", label: "All Actions" },
-  { value: "teacher_approved", label: "Teacher Approved" },
-  { value: "teacher_rejected", label: "Teacher Rejected" },
-  { value: "teacher_deleted", label: "Teacher Deleted" },
-  { value: "request_approved", label: "Request Approved" },
-  { value: "request_fulfilled_by_admin", label: "Request Fulfilled" },
-  { value: "request_deleted", label: "Request Deleted" },
-  { value: "refund_requested", label: "Refund Requested" },
-  { value: "refund_approved", label: "Refund Approved" },
-  { value: "refund_executed", label: "Refund Executed" },
-  { value: "payment_manual_submitted", label: "Manual Payment" },
-  { value: "payment_esewa_verified", label: "eSewa Payment" },
-  { value: "booking_approved", label: "Booking Accepted" },
-  { value: "booking_declined", label: "Booking Declined" },
-  { value: "online_verification_submitted", label: "Online Form Submitted" },
-  { value: "online_verification_approved", label: "Online Teaching Approved" },
-  { value: "online_verification_rejected", label: "Online Teaching Rejected" },
-  { value: "account_deleted", label: "Account Deleted" },
-];
+const ACTION_OPTIONS = [{ value: "", label: "All Actions" }, ...optionsFor("auditAction")];
 
-const ROLE_OPTIONS = [
-  { value: "", label: "All Roles" },
-  { value: "admin", label: "Admin" },
-  { value: "teacher", label: "Teacher" },
-  { value: "parent", label: "Parent" },
-];
+const ROLE_OPTIONS = [{ value: "", label: "All Roles" }, ...optionsFor("userRole")];
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -167,8 +101,8 @@ export default function AuditLogsPage() {
       setLogs(data.logs || []);
       setTotalPages(data.totalPages || 1);
       setTotal(data.total || 0);
-    } catch {
-      toast.error("Failed to load audit logs");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load audit logs"));
     } finally {
       setLoading(false);
     }
@@ -193,15 +127,14 @@ export default function AuditLogsPage() {
   };
 
   const getActionBadge = (action: string) => {
-    const config = ACTION_LABELS[action] || {
-      label: action.replace(/_/g, " "),
-      color: "bg-slate-100 text-slate-700",
-    };
+    const known = matchValue("auditAction", action);
     return (
       <span
-        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}
+        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          known ? ACTION_COLORS[known] : "bg-slate-100 text-slate-700"
+        }`}
       >
-        {config.label}
+        {known ? labelFor("auditAction", known) : action.replace(/_/g, " ")}
       </span>
     );
   };

@@ -24,13 +24,20 @@ import {
   ExternalLink,
 } from "lucide-react";
 import CreateParentRequestModal from "@/components/admin/CreateParentRequestModal";
+import EditParentRequestModal from "@/components/admin/EditParentRequestModal";
+import { describeStudents } from "@/components/admin/TuitionFields";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
 import { useRealtimeRefresh } from "@/lib/socket";
-import { parentService, ParentProfile } from "@/services/parentService";
+import {
+  parentService,
+  ParentProfile,
+  populatedUser,
+} from "@/services/parentService";
 import { useToast } from "@/hooks/useToast";
 import { getErrorMessage } from "@/services/api";
 import { getImageUrl } from "@/lib/image";
+import { labelFor, optionsFor, type RequestStatus } from "@/lib/enums";
 import { PageHeader, DataTable } from "@/components/admin/DataTable";
 import {
   ActionButton,
@@ -41,11 +48,9 @@ import {
 } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
-import dynamic from "next/dynamic";
 
-const LocationPicker = dynamic(() => import("@/components/admin/LocationPicker"), {
-  ssr: false,
-});
+// The backend refuses (409) to delete a request whose paid booking is awaiting review.
+const canDelete = (r: ParentProfile) => r.status !== "under_review";
 
 function DetailRow({
   label,
@@ -85,10 +90,9 @@ export default function ParentRequestsPage() {
   const [deleteTarget, setDeleteTarget] = useState<ParentProfile | null>(null);
   const [editing, setEditing] = useState<ParentProfile | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Record<string, string>>({});
   const [refundTarget, setRefundTarget] = useState<ParentProfile | null>(null);
   const [refundReason, setRefundReason] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<RequestStatus | "">("");
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   // A paid booking the admin is accepting or declining (status under_review)
@@ -103,7 +107,7 @@ export default function ParentRequestsPage() {
     try {
       const res = await parentService.getRequests();
       // Needs-action first: bookings to review, then requests to publish
-      const priority = (status: string) =>
+      const priority = (status: RequestStatus) =>
         status === "under_review" ? 0 : status === "pending" ? 1 : 2;
       const sorted = (res.data || []).sort((a, b) => {
         const aPrio = priority(a.status);
@@ -115,8 +119,8 @@ export default function ParentRequestsPage() {
         );
       });
       setRequests(sorted);
-    } catch {
-      toast.error("Failed to load parent requests");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to load parent requests"));
     } finally {
       setLoading(false);
     }
@@ -125,13 +129,21 @@ export default function ParentRequestsPage() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-  useRealtimeRefresh(fetchAll, [
-    "parent-request:status-updated",
-    "parent-request:created",
-    "request:fulfilled",
-    "request:available",
-    "request:under-review",
-  ]);
+  useRealtimeRefresh(
+    fetchAll,
+    [
+      "parent-request:status-updated",
+      "parent-request:created",
+      "parent-request:updated",
+      "parent-request:deleted",
+      "request:fulfilled",
+      "request:available",
+      "request:under-review",
+      "request:locked",
+      "request:expired",
+    ],
+    400,
+  );
 
   const handleView = useCallback(async (r: ParentProfile) => {
     try {
@@ -159,8 +171,8 @@ export default function ParentRequestsPage() {
         toast.success("Parent request approved and published");
         setSelected(null);
         fetchAll();
-      } catch {
-        toast.error("Failed to approve parent request");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Failed to approve parent request"));
       } finally {
         setProcessing(null);
       }
@@ -206,8 +218,8 @@ export default function ParentRequestsPage() {
       try {
         await parentService.resendInvoice(id);
         toast.success("Invoice email resent to teacher and parent");
-      } catch {
-        toast.error("Failed to resend invoice");
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Failed to resend invoice"));
       } finally {
         setProcessing(null);
       }
@@ -225,85 +237,12 @@ export default function ParentRequestsPage() {
       setRefundReason("");
       setSelected(null);
       fetchAll();
-    } catch {
-      toast.error("Failed to refund request");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to refund request"));
     } finally {
       setProcessing(null);
     }
   }, [refundTarget, refundReason, fetchAll, toast]);
-
-  const handleEdit = useCallback(async () => {
-    if (!editing) return;
-    setProcessing(editing._id);
-    try {
-      const payload: Record<string, unknown> = { ...editForm };
-      [
-        "subjects",
-        "board",
-        "specificBoard",
-        "level",
-        "grade",
-        "medium",
-      ].forEach((f) => {
-        if (typeof payload[f] === "string") {
-          payload[f] = (payload[f] as string)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-        }
-      });
-      if (typeof payload.timeSlots === "string") {
-        payload.timeSlots = (payload.timeSlots as string)
-          .split(",")
-          .map((s) => {
-            const [start, end] = s.trim().split("-");
-            return { start: start?.trim() || "", end: end?.trim() || "" };
-          })
-          .filter((s) => s.start && s.end);
-      }
-      if (payload.numberOfDays) {
-        payload.numberOfDays =
-          parseInt(payload.numberOfDays as string, 10) || null;
-      }
-      if (payload.latitude) payload.latitude = Number(payload.latitude);
-      if (payload.longitude) payload.longitude = Number(payload.longitude);
-      await parentService.update(editing._id, payload);
-      toast.success("Parent request updated");
-      setEditing(null);
-      fetchAll();
-    } catch {
-      toast.error("Failed to update parent request");
-    } finally {
-      setProcessing(null);
-    }
-  }, [editing, editForm, fetchAll, toast]);
-
-  const openEdit = useCallback((r: ParentProfile) => {
-    setEditForm({
-      name: r.name || "",
-      phone: r.phone || "",
-      location: r.location || "",
-      latitude: r.latitude?.toString() || "",
-      longitude: r.longitude?.toString() || "",
-      duration: r.duration || "",
-      tuitionType: r.tuitionType || "",
-      daysPerWeek: r.daysPerWeek || "",
-      numberOfDays: r.numberOfDays?.toString() || "",
-      teacherGender: r.teacherGender || "",
-      numberOfStudents: r.numberOfStudents || "",
-      salary: r.salary || "",
-      subjects: r.subjects?.join(", ") || "",
-      board: r.board?.join(", ") || "",
-      specificBoard: r.specificBoard?.join(", ") || "",
-      level: r.level?.join(", ") || "",
-      grade: r.grade?.join(", ") || "",
-      medium: r.medium?.join(", ") || "",
-      timeSlots:
-        r.timeSlots?.map((s) => `${s.start}-${s.end}`).join(", ") || "",
-      requirements: r.requirements || "",
-    });
-    setEditing(r);
-  }, []);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -313,8 +252,8 @@ export default function ParentRequestsPage() {
       toast.success("Parent request deleted");
       setDeleteTarget(null);
       fetchAll();
-    } catch {
-      toast.error("Failed to delete parent request");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to delete parent request"));
     } finally {
       setProcessing(null);
     }
@@ -332,6 +271,8 @@ export default function ParentRequestsPage() {
       r.status,
       r.duration,
       r.tuitionType,
+      labelFor("tuitionType", r.tuitionType),
+      labelFor("requestStatus", r.status),
       r.salary,
       r.teacherGender,
       r.subjects,
@@ -353,7 +294,7 @@ export default function ParentRequestsPage() {
       r.lockedBy?.email,
       r.paymentSlip?.paymentRef,
       r.payment?.couponCode,
-      r.refund?.requestedBy?.name,
+      populatedUser(r.refund?.requestedBy)?.name,
     ]),
   );
 
@@ -384,14 +325,7 @@ export default function ParentRequestsPage() {
         total={byStatus.length}
       />
       <div className="flex gap-1.5 mb-5 flex-wrap">
-        {[
-          { label: "All", value: "" },
-          { label: "Pending", value: "pending" },
-          { label: "Vacant", value: "vacant" },
-          { label: "Ongoing", value: "ongoing" },
-          { label: "Under Review", value: "under_review" },
-          { label: "Fulfilled", value: "fulfilled" },
-        ].map((tab) => (
+        {[{ label: "All", value: "" } as const, ...optionsFor("requestStatus")].map((tab) => (
           <button
             key={tab.value}
             onClick={() => setStatusFilter(tab.value)}
@@ -446,7 +380,7 @@ export default function ParentRequestsPage() {
                           <p className="font-medium text-slate-900">{entry.teacher?.name || "Unknown teacher"}</p>
                           <p className="text-xs text-slate-500">{entry.teacher?.email || "—"}</p>
                         </td>
-                        <td className="px-3 py-3"><StatusBadge status={entry.action} /></td>
+                        <td className="px-3 py-3"><StatusBadge status={entry.action} kind="lockAction" /></td>
                         <td className="px-3 py-3 text-slate-600">{new Date(entry.at).toLocaleString()}</td>
                         <td className="px-3 py-3 text-slate-500">
                           {entry.expiresAt ? `Until ${new Date(entry.expiresAt).toLocaleString()}` : entry.reason || "—"}
@@ -475,7 +409,7 @@ export default function ParentRequestsPage() {
         {selected && (
           <div className="space-y-3 text-sm max-h-[75vh] overflow-y-auto pr-1">
             <div className="flex items-center gap-2 mb-1">
-              <StatusBadge status={selected.status} />
+              <StatusBadge status={selected.status} kind="requestStatus" />
               {selected.platformFeePercent != null && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
                   <Percent size={12} /> {selected.platformFeePercent}% fee
@@ -550,32 +484,38 @@ export default function ParentRequestsPage() {
               />
               <DetailRow
                 label="Duration"
-                value={selected.duration}
+                value={labelFor("duration", selected.duration)}
                 icon={Clock}
               />
-              <DetailRow label="Tuition Type" value={selected.tuitionType} />
+              <DetailRow
+                label="Tuition Type"
+                value={labelFor("tuitionType", selected.tuitionType)}
+              />
               <DetailRow label="Days Per Week" value={selected.daysPerWeek} />
               <DetailRow label="Number of Days" value={selected.numberOfDays} />
               <DetailRow
                 label="Teacher Gender"
-                value={selected.teacherGender}
+                value={labelFor("teacherGender", selected.teacherGender)}
               />
               <DetailRow
                 label="Number of Students"
                 value={selected.numberOfStudents}
               />
             </div>
-            <DetailRow
-              label="Subjects"
-              value={selected.subjects?.join(", ")}
-              icon={BookOpen}
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <DetailRow label="Board" value={selected.board?.join(", ")} />
-              <DetailRow label="Level" value={selected.level?.join(", ")} />
-              <DetailRow label="Grade" value={selected.grade?.join(", ")} />
-              <DetailRow label="Medium" value={selected.medium?.join(", ")} />
-            </div>
+            {describeStudents(selected).map((student, i, all) => (
+              <div key={i} className="rounded-lg bg-slate-50 p-3">
+                {all.length > 1 && (
+                  <p className="mb-2 text-xs font-semibold text-slate-700">Student {i + 1}</p>
+                )}
+                <DetailRow label="Subjects" value={student.subjects} icon={BookOpen} />
+                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <DetailRow label="Board" value={student.board} />
+                  <DetailRow label="Level" value={student.level} />
+                  <DetailRow label="Grade" value={student.grade} />
+                  <DetailRow label="Medium" value={student.medium} />
+                </div>
+              </div>
+            ))}
             <DetailRow
               label="Time Slots"
               value={selected.timeSlots
@@ -739,10 +679,15 @@ export default function ParentRequestsPage() {
                       size={14}
                       className="inline mr-1.5 -mt-0.5"
                     />
-                    A refund has been requested by{" "}
-                    <span className="font-medium">
-                      {selected.refund.requestedBy.name}
-                    </span>
+                    A refund has been requested
+                    {populatedUser(selected.refund.requestedBy)?.name && (
+                      <>
+                        {" "}by{" "}
+                        <span className="font-medium">
+                          {populatedUser(selected.refund.requestedBy)?.name}
+                        </span>
+                      </>
+                    )}
                     . Manage it in the dedicated Refunds page.
                   </p>
                   <Link
@@ -765,7 +710,7 @@ export default function ParentRequestsPage() {
                   />
                   <DetailRow
                     label="Refunded By"
-                    value={selected.refund.refundedBy?.name}
+                    value={populatedUser(selected.refund.refundedBy)?.name}
                   />
                   <DetailRow
                     label="Refunded At"
@@ -1022,292 +967,11 @@ export default function ParentRequestsPage() {
         loading={processing === deleteTarget?._id}
       />
 
-      <Modal
-        open={!!editing}
+      <EditParentRequestModal
+        request={editing}
         onClose={() => setEditing(null)}
-        title="Edit Parent Request"
-        wide
-      >
-        {editing && (
-          <div className="space-y-5 text-sm max-h-[70vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Name
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.name || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Phone
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.phone || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, phone: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div>
-              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                Location
-              </label>
-              <textarea
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={2}
-                value={editForm.location || ""}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, location: e.target.value }))
-                }
-              />
-              <LocationPicker
-                latitude={Number(editForm.latitude) || null}
-                longitude={Number(editForm.longitude) || null}
-                onChange={({ label, latitude, longitude }) =>
-                  setEditForm((f) => ({
-                    ...f,
-                    location: label,
-                    latitude: String(latitude),
-                    longitude: String(longitude),
-                  }))
-                }
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Duration
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.duration || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, duration: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Tuition Type
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.tuitionType || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, tuitionType: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Days Per Week
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.daysPerWeek || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, daysPerWeek: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Number of Days
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  type="number"
-                  value={editForm.numberOfDays || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, numberOfDays: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Teacher Gender
-                </label>
-                <select
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.teacherGender || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      teacherGender: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Select</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Any">Any</option>
-                </select>
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Number of Students
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.numberOfStudents || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      numberOfStudents: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Salary
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.salary || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, salary: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Board (comma separated)
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.board || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, board: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Specific Board
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.specificBoard || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({
-                      ...f,
-                      specificBoard: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Level (comma separated)
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.level || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, level: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Grade (comma separated)
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.grade || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, grade: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                  Medium (comma separated)
-                </label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={editForm.medium || ""}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, medium: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div>
-              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                Subjects (comma separated)
-              </label>
-              <input
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={editForm.subjects || ""}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, subjects: e.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                Time Slots (e.g. 10:00-12:00, 14:00-16:00)
-              </label>
-              <input
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={editForm.timeSlots || ""}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, timeSlots: e.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className="font-medium text-slate-400 text-xs uppercase tracking-wider block mb-1">
-                Requirements
-              </label>
-              <textarea
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={4}
-                placeholder="Add any special learning requirements, preferences, or notes"
-                value={editForm.requirements || ""}
-                onChange={(e) =>
-                  setEditForm((f) => ({ ...f, requirements: e.target.value }))
-                }
-              />
-            </div>
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-              <ActionButton
-                icon={Eye}
-                label="Cancel"
-                onClick={() => setEditing(null)}
-                color="slate"
-              />
-              <ActionButtonSolid
-                icon={CheckCircle}
-                label="Save"
-                onClick={handleEdit}
-                disabled={processing === editing._id}
-                color="blue"
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
+        onSaved={fetchAll}
+      />
 
       {loading ? (
         <Loading />
@@ -1315,9 +979,9 @@ export default function ParentRequestsPage() {
         <EmptyState
           message={
             search.trim()
-              ? `No ${statusFilter ? `${statusFilter} ` : ""}requests match "${search.trim()}"`
+              ? `No ${statusFilter ? `"${labelFor("requestStatus", statusFilter)}" ` : ""}requests match "${search.trim()}"`
               : statusFilter
-                ? `No ${statusFilter} requests`
+                ? `No "${labelFor("requestStatus", statusFilter)}" requests`
                 : "No parent requests found"
           }
         />
@@ -1358,7 +1022,7 @@ export default function ParentRequestsPage() {
               header: "Duration",
               render: (r) => (
                 <div>
-                  <span className="text-slate-500">{r.duration || "—"}</span>
+                  <span className="text-slate-500">{labelFor("duration", r.duration) || "—"}</span>
                   {r.platformFeePercent != null && (
                     <p className="text-indigo-500 text-xs">
                       {r.platformFeePercent}% fee
@@ -1401,7 +1065,7 @@ export default function ParentRequestsPage() {
               header: "Status",
               render: (r) => (
                 <div className="flex items-center gap-1.5">
-                  <StatusBadge status={r.status} />
+                  <StatusBadge status={r.status} kind="requestStatus" />
                   {r.refund?.requestedBy && !r.refund?.refundedBy && (
                     <Link
                       href="/admin/refunds"
@@ -1460,17 +1124,19 @@ export default function ParentRequestsPage() {
                   <ActionButton
                     icon={Pencil}
                     label="Edit"
-                    onClick={() => openEdit(r)}
+                    onClick={() => setEditing(r)}
                     disabled={processing === r._id}
                     color="amber"
                   />
-                  <ActionButton
-                    icon={Trash2}
-                    label="Delete"
-                    onClick={() => setDeleteTarget(r)}
-                    disabled={processing === r._id}
-                    color="red"
-                  />
+                  {canDelete(r) && (
+                    <ActionButton
+                      icon={Trash2}
+                      label="Delete"
+                      onClick={() => setDeleteTarget(r)}
+                      disabled={processing === r._id}
+                      color="red"
+                    />
+                  )}
                 </div>
               ),
             },
