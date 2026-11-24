@@ -98,6 +98,23 @@ export const LOCK_ACTIONS = [
   { value: "fulfilled", label: "Fulfilled" },
 ] as const satisfies readonly EnumOption[];
 
+// ── Post payments (backend src/utils/postPaymentLedger.js) ──────────────
+
+/** PostPayment.status, in tab order. */
+export const POST_PAYMENT_STATUSES = [
+  { value: "pending", label: "Pending" },
+  { value: "converted", label: "Converted" },
+  { value: "rejected", label: "Rejected" },
+  { value: "blacklisted", label: "Blacklisted" },
+  { value: "draft", label: "Draft (on hold)" },
+] as const satisfies readonly EnumOption[];
+
+/** Where the tuition lead came from. */
+export const POST_PAYMENT_SOURCES = [
+  { value: "Agrade", label: "Agrade" },
+  { value: "Aarambha", label: "Aarambha" },
+] as const satisfies readonly EnumOption[];
+
 // ── Teachers ────────────────────────────────────────────────────────────
 
 /** TeacherProfile.status (profile / CV verification), in tab order. */
@@ -176,6 +193,15 @@ export const AUDIT_ACTIONS = [
   { value: "online_verification_submitted", label: "Online Form Submitted" },
   { value: "online_verification_approved", label: "Online Teaching Approved" },
   { value: "online_verification_rejected", label: "Online Teaching Rejected" },
+  { value: "post_payment_created", label: "Post Payment Recorded" },
+  { value: "post_payment_held", label: "Post Payment Held (Draft)" },
+  { value: "post_payment_activated", label: "Post Payment Access Granted" },
+  { value: "post_payment_edited", label: "Post Payment Edited" },
+  { value: "post_payment_converted", label: "Post Payment Converted" },
+  { value: "post_payment_rejected", label: "Post Payment Rejected" },
+  { value: "post_payment_blacklisted", label: "Post Payment Blacklisted" },
+  { value: "post_payment_pending", label: "Post Payment Reopened" },
+  { value: "post_payment_deleted", label: "Post Payment Deleted" },
   { value: "notice_deleted", label: "Notice Deleted" },
   { value: "account_deleted", label: "Account Deleted" },
 ] as const satisfies readonly EnumOption[];
@@ -194,6 +220,8 @@ const ENUMS = {
   numberOfDays: SHORT_TERM_DAYS,
   requestStatus: REQUEST_STATUSES,
   lockAction: LOCK_ACTIONS,
+  postPaymentStatus: POST_PAYMENT_STATUSES,
+  postPaymentSource: POST_PAYMENT_SOURCES,
   teacherStatus: TEACHER_STATUSES,
   onlineTeachingStatus: ONLINE_TEACHING_STATUSES,
   onlineClassLevel: ONLINE_CLASS_LEVELS,
@@ -215,6 +243,8 @@ export type Level = EnumValue<"level">;
 export type Medium = EnumValue<"medium">;
 export type RequestStatus = EnumValue<"requestStatus">;
 export type LockAction = EnumValue<"lockAction">;
+export type PostPaymentStatus = EnumValue<"postPaymentStatus">;
+export type PostPaymentSource = EnumValue<"postPaymentSource">;
 export type TeacherStatus = EnumValue<"teacherStatus">;
 export type OnlineTeachingStatus = EnumValue<"onlineTeachingStatus">;
 export type OnlineClassLevel = EnumValue<"onlineClassLevel">;

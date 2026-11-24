@@ -232,8 +232,9 @@ export default function AdminDashboard() {
         parentReqsRes.data.data?.filter((t) => t.status === "pending")
           .length || 0;
       const parentReqs = parentReqsRes.data.data || [];
+      // Paid-in-app bookings only; post-paid assignments are on Post Payments.
       const fulfilledReqs = parentReqs.filter(
-        (r) => r.status === "fulfilled",
+        (r) => r.status === "fulfilled" && r.fulfillmentType !== "postpaid",
       );
       const totalRevenue = fulfilledReqs.reduce(
         (sum, r) => sum + (r.payment?.payable || 0),
@@ -252,6 +253,7 @@ export default function AdminDashboard() {
       const periodFulfilled = parentReqs.filter(
         (r) =>
           r.status === "fulfilled" &&
+          r.fulfillmentType !== "postpaid" &&
           isInRange(r.paymentSlip?.paidAt || r.createdAt),
       );
       setDailySummary({
@@ -274,6 +276,7 @@ export default function AdminDashboard() {
         const payments = parentReqs.filter(
           (request) =>
             request.status === "fulfilled" &&
+            request.fulfillmentType !== "postpaid" &&
             dateKey(request.paymentSlip?.paidAt || request.createdAt) === date,
         );
         return {
@@ -561,7 +564,8 @@ export default function AdminDashboard() {
                 href: "/admin/parent-requests",
                 label: "Review Parent Tuition Requests",
               },
-              { href: "/admin/payments", label: "View Payments & Invoices" },
+              { href: "/admin/payments", label: "View Pre Payments & Invoices" },
+              { href: "/admin/post-payments", label: "Track Post Payments" },
               { href: "/admin/notices", label: "Manage Notices" },
               { href: "/admin/cms", label: "Update CMS Content" },
             ].map((item) => (

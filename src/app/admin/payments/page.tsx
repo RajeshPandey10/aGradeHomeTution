@@ -34,6 +34,12 @@ import { Modal } from "@/components/admin/Modal";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { matchesSearch } from "@/lib/search";
 import { getErrorMessage } from "@/lib/errors";
+import { DayBlock, groupByDay } from "@/components/admin/DayBlocks";
+import { formatRsCompact } from "@/lib/money";
+import { useToday } from "@/lib/nepalTime";
+
+// When the payment happened (falls back to the request date for old records).
+const paidOn = (r: ParentProfile) => r.paymentSlip?.paidAt || r.createdAt;
 
 function DetailRow({
   label,
@@ -90,6 +96,10 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+/**
+ * Pre payments: tuitions a teacher paid for in the app before getting the
+ * parent's contact. Post-paid assignments live on the Post Payments page.
+ */
 export default function PaymentsPage() {
   const [requests, setRequests] = useState<ParentProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,11 +114,14 @@ export default function PaymentsPage() {
     onDate: number | null;
   } | null>(null);
   const toast = useToast();
+  const today = useToday();
 
   const fetchAll = useCallback(async () => {
     try {
       const res = await parentService.getRequests();
       const paymentRequests = (res.data || [])
+        // Post-paid assignments have no up-front payment (see Post Payments)
+        .filter((r) => r.fulfillmentType !== "postpaid")
         // Bookings under review are paid too; they count as revenue once accepted
         .filter((r) => r.status === "fulfilled" || r.status === "under_review" || r.refund?.refundedAt)
         .sort((a, b) => {
@@ -208,7 +221,7 @@ export default function PaymentsPage() {
   const dateFulfilled = dateRequests.filter(
     (r) => r.status === "fulfilled",
   ).length;
-  // Search narrows the table only; the summary cards above stay on the date filter.
+  // Search narrows the blocks only; the summary cards above stay on the date filter.
   const filtered = dateRequests.filter((r) =>
     matchesSearch(search, [
       r.name,
@@ -237,8 +250,8 @@ export default function PaymentsPage() {
   return (
     <div>
       <PageHeader
-        title="Payments"
-        subtitle="View all payment transactions and invoices"
+        title="Pre Payments"
+        subtitle="Tuitions teachers paid for up front, grouped by payment day"
       />
 
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
@@ -637,6 +650,26 @@ export default function PaymentsPage() {
           }
         />
       ) : (
+        <div className="space-y-6">
+        {groupByDay(filtered, paidOn).map((block) => {
+          const fulfilled = block.items.filter((r) => r.status === "fulfilled");
+          const awaiting = block.items.filter((r) => r.status === "under_review").length;
+          return (
+        <DayBlock
+          key={block.key || "undated"}
+          day={block.key}
+          today={today}
+          count={block.items.length}
+          countLabel={["payment", "payments"]}
+          stats={[
+            {
+              label: "Collected",
+              value: formatRsCompact(fulfilled.reduce((sum, r) => sum + (r.payment?.payable || 0), 0)),
+              tone: "emerald",
+            },
+            ...(awaiting ? [{ label: "Awaiting review", value: String(awaiting), tone: "amber" as const }] : []),
+          ]}
+        >
         <DataTable
           columns={[
             {
@@ -716,9 +749,9 @@ export default function PaymentsPage() {
               key: "date",
               header: "Date",
               render: (r) => (
-                <span className="text-slate-500 text-xs">
+                <span className="text-slate-500 text-xs whitespace-nowrap">
                   {r.paymentSlip?.paidAt
-                    ? new Date(r.paymentSlip.paidAt).toLocaleDateString()
+                    ? new Date(r.paymentSlip.paidAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
                     : "—"}
                 </span>
               ),
@@ -772,8 +805,12 @@ export default function PaymentsPage() {
               ),
             },
           ]}
-          data={filtered}
+          data={block.items}
         />
+        </DayBlock>
+          );
+        })}
+        </div>
       )}
     </div>
   );

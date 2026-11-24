@@ -37,6 +37,15 @@ const STATUS_TABS = [
 
 const REASON_MAX = 500;
 
+/** "youtu.be", "drive.google.com" — where a demo video link points. */
+const videoHost = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "link";
+  }
+};
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -219,14 +228,24 @@ export default function OnlineVerificationsPage() {
               </Field>
               <Field label="2. Demo video">
                 {selected.onlineTeaching?.demoVideoUrl ? (
-                  <a
-                    href={selected.onlineTeaching.demoVideoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                  >
-                    <PlayCircle size={14} /> Watch on Google Drive <ExternalLink size={12} />
-                  </a>
+                  // Any link is accepted now; only http(s) ones are made clickable.
+                  /^https?:\/\//i.test(selected.onlineTeaching.demoVideoUrl) ? (
+                    <a
+                      href={selected.onlineTeaching.demoVideoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex max-w-full items-center gap-1 text-blue-600 hover:underline"
+                      title={selected.onlineTeaching.demoVideoUrl}
+                    >
+                      <PlayCircle size={14} className="shrink-0" /> Watch demo video
+                      <span className="truncate text-xs text-slate-400">
+                        ({videoHost(selected.onlineTeaching.demoVideoUrl)})
+                      </span>
+                      <ExternalLink size={12} className="shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="break-all text-slate-700">{selected.onlineTeaching.demoVideoUrl}</span>
+                  )
                 ) : (
                   "—"
                 )}

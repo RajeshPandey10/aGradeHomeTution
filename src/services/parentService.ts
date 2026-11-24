@@ -4,6 +4,8 @@ import type {
   CouponType,
   Duration,
   LockAction,
+  PostPaymentSource,
+  PostPaymentStatus,
   RequestStatus,
   TeacherGender,
   TeacherStatus,
@@ -72,6 +74,26 @@ export interface ParentProfile {
   /** The teacher holding the request: applying (ongoing), or paid and awaiting review (under_review). */
   lockedBy?: { _id: string; name: string; email: string; phoneNumber?: string };
   platformFeePercent?: number;
+  /** How a fulfilled request was paid for; null/missing on older ones (prepaid). */
+  fulfillmentType?: "prepaid" | "postpaid" | null;
+  /** Id of the post payment holding the request (post-paid only). */
+  postPayment?: string | null;
+  /** Summary of that post payment, attached by the admin request list. */
+  postPaymentInfo?: {
+    _id: string;
+    status: PostPaymentStatus;
+    source: PostPaymentSource;
+    commissionPercent: number;
+    commissionAmount: number;
+    partialPaidAmount: number;
+    returnDays: number;
+    recordedAt: string;
+    dueDate: string;
+    collected: number;
+    pending: number;
+    badDebt: number;
+    daysLeft: number | null;
+  } | null;
   payment?: {
     grossAmount: number;
     total: number;

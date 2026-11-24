@@ -26,6 +26,7 @@ import {
   Quote,
   BarChart3,
   MonitorPlay,
+  HandCoins,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
@@ -56,8 +57,9 @@ const navItems = [
     label: "Parent Requests",
     icon: ClipboardList,
   },
+  { href: "/admin/post-payments", label: "Post Payments", icon: HandCoins },
   { href: "/admin/refunds", label: "Refunds", icon: RotateCcw },
-  { href: "/admin/payments", label: "Payments", icon: CreditCard },
+  { href: "/admin/payments", label: "Pre Payments", icon: CreditCard },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/notifications", label: "Send Notification", icon: Bell },
   {

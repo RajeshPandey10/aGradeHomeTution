@@ -12,6 +12,11 @@ const colors: Record<string, string> = {
   under_review: "bg-orange-100 text-orange-700",
   not_submitted: "bg-slate-100 text-slate-600",
   fulfilled: "bg-emerald-100 text-emerald-700",
+  // post payments
+  converted: "bg-emerald-100 text-emerald-700",
+  blacklisted: "bg-zinc-800 text-white",
+  draft: "bg-slate-50 text-slate-600 border border-dashed border-slate-300",
+  postpaid: "bg-violet-100 text-violet-700",
   // lock history actions
   paid: "bg-orange-100 text-orange-700",
   approved: "bg-emerald-100 text-emerald-700",

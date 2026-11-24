@@ -22,6 +22,7 @@ import {
   UserCheck,
   FileText,
   ExternalLink,
+  HandCoins,
 } from "lucide-react";
 import CreateParentRequestModal from "@/components/admin/CreateParentRequestModal";
 import EditParentRequestModal from "@/components/admin/EditParentRequestModal";
@@ -48,9 +49,27 @@ import {
 } from "@/components/admin/UI";
 import { Modal } from "@/components/admin/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { DayBlock, groupByDay } from "@/components/admin/DayBlocks";
+import { PostPayFormModal } from "@/components/admin/post-payments/PostPayFormModal";
+import { ReturnDaysBadge } from "@/components/admin/post-payments/bits";
+import { formatRs, formatRsCompact } from "@/lib/money";
+import { useToday } from "@/lib/nepalTime";
 
 // The backend refuses (409) to delete a request whose paid booking is awaiting review.
+
 const canDelete = (r: ParentProfile) => r.status !== "under_review";
+
+// A post payment can take over a request nobody has booked yet.
+const canPostPay = (r: ParentProfile) => r.status === "pending" || r.status === "vacant";
+const isPostpaid = (r: ParentProfile) => r.fulfillmentType === "postpaid";
+
+/** Money actually received for a request: the prepaid platform fee, or what a post payment has collected. */
+const collectedFor = (r: ParentProfile) =>
+  isPostpaid(r)
+    ? r.postPaymentInfo?.collected || 0
+    : r.status === "fulfilled"
+      ? r.payment?.payable || 0
+      : 0;
 
 function DetailRow({
   label,
@@ -101,6 +120,8 @@ export default function ParentRequestsPage() {
     decision: "approve" | "decline";
   } | null>(null);
   const [declineNote, setDeclineNote] = useState("");
+  const [postPayTarget, setPostPayTarget] = useState<ParentProfile | null>(null);
+  const today = useToday();
   const toast = useToast();
 
   const fetchAll = useCallback(async () => {
@@ -141,6 +162,9 @@ export default function ParentRequestsPage() {
       "request:under-review",
       "request:locked",
       "request:expired",
+      "post-payment:created",
+      "post-payment:updated",
+      "post-payment:deleted",
     ],
     400,
   );
@@ -295,8 +319,11 @@ export default function ParentRequestsPage() {
       r.paymentSlip?.paymentRef,
       r.payment?.couponCode,
       populatedUser(r.refund?.requestedBy)?.name,
+      isPostpaid(r) && ["post-paid", "postpaid", r.postPaymentInfo?.source, r.postPaymentInfo?.status],
     ]),
   );
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const dayBlocks = groupByDay(filtered, (r) => r.createdAt);
 
   return (
     <div>
@@ -608,6 +635,40 @@ export default function ParentRequestsPage() {
               </>
             )}
 
+            {isPostpaid(selected) && (
+              <>
+                <SectionHeader title="Post Payment" />
+                <div className="bg-violet-50 border border-violet-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  {selected.postPaymentInfo ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+                      <DetailRow label="Status" value={labelFor("postPaymentStatus", selected.postPaymentInfo.status)} />
+                      <DetailRow label="Source" value={selected.postPaymentInfo.source} />
+                      <DetailRow
+                        label="Commission"
+                        value={`${selected.postPaymentInfo.commissionPercent}% · ${formatRs(selected.postPaymentInfo.commissionAmount)}`}
+                      />
+                      <div>
+                        <span className="font-medium text-slate-400 text-xs uppercase tracking-wider">Return days</span>
+                        <div className="mt-0.5">
+                          <ReturnDaysBadge pp={selected.postPaymentInfo} today={today} />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-violet-800 flex-1">
+                      Assigned through a post payment whose record has since been deleted.
+                    </p>
+                  )}
+                  <Link
+                    href="/admin/post-payments"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-100 transition-colors"
+                  >
+                    <HandCoins size={13} /> Open Post Payments
+                  </Link>
+                </div>
+              </>
+            )}
+
             {selected.payment && selected.payment.grossAmount > 0 && (
               <>
                 <SectionHeader title="Payment Breakdown" />
@@ -770,7 +831,18 @@ export default function ParentRequestsPage() {
                   />
                 </>
               )}
-              {selected.status === "fulfilled" && (
+              {canPostPay(selected) && (
+                <ActionButtonSolid
+                  icon={HandCoins}
+                  label="Post-pay"
+                  onClick={() => {
+                    setPostPayTarget(selected);
+                    setSelected(null);
+                  }}
+                  color="blue"
+                />
+              )}
+              {selected.status === "fulfilled" && !isPostpaid(selected) && (
                 <>
                   <ActionButtonSolid
                     icon={Mail}
@@ -890,23 +962,17 @@ export default function ParentRequestsPage() {
               won&apos;t see the parent&apos;s contact.
             </p>
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4">
-              {/* Mirrors announceBookingDeclined in the backend's
-                  src/services/bookingReviewService.js — keep in sync. */}
+              {/* Mirrors the notification in announceBookingDeclined (backend
+                  src/services/bookingReviewService.js) — keep in sync. */}
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                 The teacher will be told
               </p>
+              <p className="text-sm font-medium text-slate-800">Booking not confirmed</p>
               <p className="text-sm text-slate-700">
-                Thank you so much for your interest in this tuition, and for your patience while
-                our team reviewed your booking. We&apos;re truly sorry — after careful
-                consideration, we weren&apos;t able to confirm it this time, as some of this
-                vacancy&apos;s requirements weren&apos;t fully met. This is in no way a reflection
-                of your abilities as a teacher.{" "}
+                We could not confirm your booking for this tuition.{" "}
                 {reviewAction.request.paymentSlip?.paymentAmount
-                  ? `The Rs. ${reviewAction.request.paymentSlip.paymentAmount} you paid`
-                  : "Any payment you made"}{" "}
-                will be refunded to you in full, and our team will contact you shortly about it. New
-                tuitions are posted every day, and we would be glad to see you apply for the next
-                one that suits you.
+                  ? `Your payment of Rs. ${reviewAction.request.paymentSlip.paymentAmount} will be refunded.`
+                  : "Any payment you made will be refunded."}
               </p>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex gap-2 text-sm text-amber-800">
@@ -973,6 +1039,38 @@ export default function ParentRequestsPage() {
         onSaved={fetchAll}
       />
 
+      <PostPayFormModal
+        open={!!postPayTarget}
+        request={postPayTarget}
+        onClose={() => setPostPayTarget(null)}
+        onSaved={() => fetchAll()}
+      />
+
+      {!loading && (reviewCount > 0 || pendingCount > 0) && statusFilter === "" && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+          <span className="flex-1">
+            Needs action:{" "}
+            {[
+              reviewCount > 0 && `${reviewCount} paid ${reviewCount === 1 ? "booking" : "bookings"} to review`,
+              pendingCount > 0 && `${pendingCount} ${pendingCount === 1 ? "request" : "requests"} to approve`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+          {reviewCount > 0 && (
+            <button type="button" onClick={() => setStatusFilter("under_review")} className="cursor-pointer rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100">
+              Show bookings
+            </button>
+          )}
+          {pendingCount > 0 && (
+            <button type="button" onClick={() => setStatusFilter("pending")} className="cursor-pointer rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100">
+              Show requests
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <Loading />
       ) : filtered.length === 0 ? (
@@ -986,6 +1084,23 @@ export default function ParentRequestsPage() {
           }
         />
       ) : (
+        <div className="space-y-6">
+        {dayBlocks.map((block) => {
+          const fulfilledCount = block.items.filter((r) => r.status === "fulfilled").length;
+          const postpaidCount = block.items.filter(isPostpaid).length;
+          return (
+        <DayBlock
+          key={block.key || "undated"}
+          day={block.key}
+          today={today}
+          count={block.items.length}
+          countLabel={["request", "requests"]}
+          stats={[
+            { label: "Collected", value: formatRsCompact(block.items.reduce((sum, r) => sum + collectedFor(r), 0)), tone: "emerald" },
+            ...(fulfilledCount ? [{ label: "Fulfilled", value: String(fulfilledCount), tone: "blue" as const }] : []),
+            ...(postpaidCount ? [{ label: "Post-paid", value: String(postpaidCount), tone: "violet" as const }] : []),
+          ]}
+        >
         <DataTable
           columns={[
             {
@@ -1045,9 +1160,24 @@ export default function ParentRequestsPage() {
               header: "Teacher",
               render: (r) =>
                 r.assignedTeacher ? (
-                  <span className="text-emerald-600 text-xs font-medium">
-                    {r.assignedTeacher.name}
-                  </span>
+                  <div>
+                    <span className="text-emerald-600 text-xs font-medium">
+                      {r.assignedTeacher.name}
+                    </span>
+                    {isPostpaid(r) && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <StatusBadge status="postpaid" label="Post-paid" />
+                        {r.postPaymentInfo && r.postPaymentInfo.status !== "pending" && (
+                          <StatusBadge status={r.postPaymentInfo.status} kind="postPaymentStatus" />
+                        )}
+                      </div>
+                    )}
+                    {isPostpaid(r) && r.postPaymentInfo?.status === "pending" && (
+                      <div className="mt-1">
+                        <ReturnDaysBadge pp={r.postPaymentInfo} today={today} compact />
+                      </div>
+                    )}
+                  </div>
                 ) : r.lockedBy && r.status === "under_review" ? (
                   <span className="text-orange-600 text-xs font-medium">
                     {r.lockedBy.name} (paid, awaiting review)
@@ -1088,6 +1218,15 @@ export default function ParentRequestsPage() {
                     onClick={() => handleView(r)}
                     color="blue"
                   />
+                  {canPostPay(r) && (
+                    <ActionButton
+                      icon={HandCoins}
+                      label="Post-pay"
+                      onClick={() => setPostPayTarget(r)}
+                      disabled={processing === r._id}
+                      color="purple"
+                    />
+                  )}
                   {r.status === "pending" && (
                     <ActionButton
                       icon={CheckCircle}
@@ -1106,7 +1245,7 @@ export default function ParentRequestsPage() {
                       color="amber"
                     />
                   )}
-                  {r.status === "fulfilled" && (
+                  {r.status === "fulfilled" && !isPostpaid(r) && (
                     <ActionButton
                       icon={Mail}
                       label="Invoice"
@@ -1141,8 +1280,12 @@ export default function ParentRequestsPage() {
               ),
             },
           ]}
-          data={filtered}
+          data={block.items}
         />
+        </DayBlock>
+          );
+        })}
+        </div>
       )}
     </div>
   );
