@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore, type SessionTokens, type User } from "@/store/authStore";
 import api from "@/lib/axios";
 import { getErrorMessage } from "@/lib/errors";
-import { Shield, ArrowLeft, RefreshCw } from "lucide-react";
+import { Shield, ArrowLeft, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 
 // verify-otp sends the user as `{ id, ... }`; the store keeps /api/auth/me's `_id`.
@@ -13,7 +13,23 @@ interface VerifyOtpData extends SessionTokens {
   user: Omit<User, "_id"> & { _id?: string; id?: string };
 }
 
+// useSearchParams() needs a Suspense boundary, or `next build` (static
+// export) fails to prerender this page.
 export default function VerifyOTPPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <Loader2 className="animate-spin text-blue-600" size={32} />
+        </div>
+      }
+    >
+      <VerifyOTPForm />
+    </Suspense>
+  );
+}
+
+function VerifyOTPForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
